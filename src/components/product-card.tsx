@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +42,9 @@ export function ProductCard({ product }: ProductCardProps) {
       </CardContent>
       <CardFooter className="p-4 flex justify-between items-center">
         <p className="text-xl font-bold text-primary">${product.price.toFixed(2)}</p>
-        <Button>Buy Now</Button>
+        <Button asChild>
+            <Link href={`/store/${product.id}`}>View Details</Link>
+        </Button>
       </CardFooter>
     </Card>
   );
