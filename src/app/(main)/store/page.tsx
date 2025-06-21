@@ -1,38 +1,84 @@
+
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase/client";
+
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductCard, type Product } from "@/components/product-card";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Search } from "lucide-react";
-
-const dummyProducts: Product[] = [
-  { id: '1', title: 'Advanced Calculus Course', description: 'Deep dive into multivariate calculus and differential equations.', price: 49.99, imageUrl: 'https://placehold.co/600x400.png', category: 'Course', subject: 'Math' },
-  { id: '2', title: 'Introduction to Python', description: 'Learn the fundamentals of Python programming from scratch.', price: 29.99, imageUrl: 'https://placehold.co/600x400.png', category: 'Course', subject: 'Programming' },
-  { id: '3', title: 'World History Notes', description: 'Comprehensive notes covering major historical events.', price: 9.99, imageUrl: 'https://placehold.co/600x400.png', category: 'Notes', subject: 'History' },
-  { id: '4', title: 'Chemistry Mock Exam', description: 'Practice exam with detailed solutions and explanations.', price: 14.99, imageUrl: 'https://placehold.co/600x400.png', category: 'Mock Exam', subject: 'Science' },
-  { id: '5', title: 'Grammar Worksheets', description: 'A collection of worksheets to improve your grammar skills.', price: 5.99, imageUrl: 'https://placehold.co/600x400.png', category: 'Worksheet', subject: 'English' },
-  { id: '6', title: 'Physics 101 Course', description: 'Master the basics of classical mechanics and electromagnetism.', price: 49.99, imageUrl: 'https://placehold.co/600x400.png', category: 'Course', subject: 'Science' },
-  { id: '7', title: 'Algebra Practice Problems', description: 'Hundreds of practice problems to sharpen your algebra skills.', price: 7.99, imageUrl: 'https://placehold.co/600x400.png', category: 'Worksheet', subject: 'Math' },
-  { id: '8', 'title': 'React for Beginners', 'description': 'Build modern web applications with React.js.', 'price': 39.99, 'imageUrl': 'https://placehold.co/600x400.png', 'category': 'Course', 'subject': 'Programming' },
-];
 
 const categories = ["All", "Course", "Notes", "Mock Exam", "Worksheet"];
 const subjects = ["All", "Math", "Programming", "History", "Science", "English"];
 
+const ProductCardSkeleton = () => (
+  <Card>
+    <CardHeader className="p-0">
+      <Skeleton className="aspect-video w-full rounded-t-lg" />
+    </CardHeader>
+    <CardContent className="p-4 space-y-2">
+      <Skeleton className="h-4 w-1/4" />
+      <Skeleton className="h-5 w-3/4" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-5/6" />
+    </CardContent>
+    <CardFooter className="p-4 flex justify-between items-center">
+      <Skeleton className="h-8 w-1/4" />
+      <Skeleton className="h-10 w-1/3" />
+    </CardFooter>
+  </Card>
+);
+
+
 export default function StorePage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [category, setCategory] = useState("All");
   const [subject, setSubject] = useState("All");
 
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+      try {
+        const productsCollection = collection(db, "products");
+        const productSnapshot = await getDocs(productsCollection);
+        const productList = productSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            title: data.title,
+            description: data.description,
+            price: data.price,
+            imageUrl: data.imageUrl,
+            category: data.category,
+            subject: data.subject,
+          }
+        }) as Product[];
+        setProducts(productList);
+      } catch (error) {
+        console.error("Error fetching products: ", error);
+        // In a real app, you might want to show a toast notification here
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
   const filteredProducts = useMemo(() => {
-    return dummyProducts.filter(product => {
+    return products.filter(product => {
       const searchMatch = product.title.toLowerCase().includes(searchTerm.toLowerCase()) || product.description.toLowerCase().includes(searchTerm.toLowerCase());
       const categoryMatch = category === "All" || product.category === category;
       const subjectMatch = subject === "All" || product.subject === subject;
       return searchMatch && categoryMatch && subjectMatch;
     });
-  }, [searchTerm, category, subject]);
+  }, [products, searchTerm, category, subject]);
 
   return (
     <div className="bg-background text-foreground">
@@ -56,10 +102,11 @@ export default function StorePage() {
               className="pl-10"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              disabled={loading}
             />
           </div>
           <div className="flex gap-4">
-            <Select value={category} onValueChange={setCategory}>
+            <Select value={category} onValueChange={setCategory} disabled={loading}>
               <SelectTrigger className="w-full md:w-[180px]">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
@@ -67,7 +114,7 @@ export default function StorePage() {
                 {categories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={subject} onValueChange={setSubject}>
+            <Select value={subject} onValueChange={setSubject} disabled={loading}>
               <SelectTrigger className="w-full md:w-[180px]">
                 <SelectValue placeholder="Subject" />
               </SelectTrigger>
@@ -78,7 +125,13 @@ export default function StorePage() {
           </div>
         </div>
 
-        {filteredProducts.length > 0 ? (
+        {loading ? (
+           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <ProductCardSkeleton key={i} />
+            ))}
+           </div>
+        ) : filteredProducts.length > 0 ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredProducts.map(product => (
               <ProductCard key={product.id} product={product} />
@@ -87,7 +140,7 @@ export default function StorePage() {
         ) : (
           <div className="text-center py-16">
             <h2 className="text-2xl font-semibold mb-2">No Products Found</h2>
-            <p className="text-muted-foreground">Try adjusting your search or filters.</p>
+            <p className="text-muted-foreground">Try adjusting your search or filters. You may also need to add products to the database.</p>
           </div>
         )}
       </div>
