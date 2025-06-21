@@ -1,0 +1,296 @@
+
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { collection, doc, getDoc, addDoc, getDocs, query, where, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase/client";
+
+import { type Course } from "@/components/product-card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { ArrowLeft, Loader2, Trash2, UserPlus } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const addStudentSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address." }),
+});
+
+type Enrollment = {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentEmail: string;
+};
+
+export default function EnrollmentsPage() {
+  const params = useParams();
+  const router = useRouter();
+  const { toast } = useToast();
+  const courseId = params.courseId as string;
+
+  const [course, setCourse] = useState<Course | null>(null);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [studentToRemove, setStudentToRemove] = useState<Enrollment | null>(null);
+
+  const form = useForm<z.infer<typeof addStudentSchema>>({
+    resolver: zodResolver(addStudentSchema),
+    defaultValues: { email: "" },
+  });
+
+  useEffect(() => {
+    if (!courseId) return;
+
+    const fetchEnrollmentData = async () => {
+      setLoading(true);
+      try {
+        // Fetch course details
+        const courseDocRef = doc(db, "products", courseId);
+        const courseDoc = await getDoc(courseDocRef);
+        if (!courseDoc.exists()) {
+          toast({ variant: "destructive", title: "Course not found" });
+          router.push("/dashboard/teacher");
+          return;
+        }
+        setCourse({ id: courseDoc.id, ...courseDoc.data() } as Course);
+
+        // Fetch enrollments
+        const enrollmentsQuery = query(collection(db, "enrollments"), where("courseId", "==", courseId));
+        const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
+        const fetchedEnrollments = enrollmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Enrollment[];
+        setEnrollments(fetchedEnrollments);
+
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        toast({ variant: "destructive", title: "Failed to load data" });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEnrollmentData();
+  }, [courseId, router, toast]);
+
+  const handleAddStudent = async (values: z.infer<typeof addStudentSchema>) => {
+    setSubmitting(true);
+    try {
+      // 1. Find the user by email
+      const usersQuery = query(collection(db, "users"), where("email", "==", values.email));
+      const userSnapshot = await getDocs(usersQuery);
+
+      if (userSnapshot.empty) {
+        toast({ variant: "destructive", title: "Student not found", description: "No user exists with this email address." });
+        return;
+      }
+      
+      const studentDoc = userSnapshot.docs[0];
+      const studentData = studentDoc.data();
+      
+      if (studentData.role !== 'STUDENT') {
+        toast({ variant: "destructive", title: "Not a Student", description: "This user is not registered as a student." });
+        return;
+      }
+
+      // 2. Check if already enrolled
+      const isEnrolled = enrollments.some(e => e.studentId === studentDoc.id);
+      if (isEnrolled) {
+        toast({ variant: "destructive", title: "Already Enrolled", description: "This student is already enrolled in this course." });
+        return;
+      }
+
+      // 3. Create enrollment
+      const newEnrollmentRef = await addDoc(collection(db, "enrollments"), {
+        courseId: courseId,
+        studentId: studentDoc.id,
+        studentName: studentData.displayName,
+        studentEmail: studentData.email,
+        enrolledAt: serverTimestamp(),
+      });
+      
+      const newEnrollment: Enrollment = {
+        id: newEnrollmentRef.id,
+        studentId: studentDoc.id,
+        studentName: studentData.displayName,
+        studentEmail: studentData.email
+      };
+
+      setEnrollments([...enrollments, newEnrollment]);
+      form.reset();
+      toast({ title: "Student Enrolled!", description: `${studentData.displayName} has been added to the course.`});
+
+    } catch (error) {
+      console.error("Error enrolling student:", error);
+      toast({ variant: "destructive", title: "Enrollment failed", description: "An unexpected error occurred." });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRemoveClick = (enrollment: Enrollment) => {
+    setStudentToRemove(enrollment);
+  };
+  
+  const handleRemoveConfirm = async () => {
+    if (!studentToRemove) return;
+
+    try {
+        await deleteDoc(doc(db, "enrollments", studentToRemove.id));
+        setEnrollments(enrollments.filter(e => e.id !== studentToRemove.id));
+        toast({
+            title: "Student Removed",
+            description: `"${studentToRemove.studentName}" has been removed from the course.`,
+        });
+    } catch (error) {
+        console.error("Error removing student: ", error);
+        toast({
+            variant: "destructive",
+            title: "Removal Failed",
+            description: "There was a problem removing the student.",
+        });
+    } finally {
+        setStudentToRemove(null);
+    }
+  };
+
+  if (loading) {
+    return (
+        <div className="container py-8">
+            <Skeleton className="h-8 w-64 mb-4" />
+            <div className="grid lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-1 space-y-8">
+                  <Skeleton className="h-48 w-full" />
+              </div>
+              <div className="lg:col-span-2">
+                  <Skeleton className="h-64 w-full" />
+              </div>
+            </div>
+        </div>
+    )
+  }
+
+  return (
+    <>
+      <AlertDialog open={!!studentToRemove} onOpenChange={(open) => !open && setStudentToRemove(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove "{studentToRemove?.studentName}" from the course. They will lose access to all course materials. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRemoveConfirm}>Remove</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <div className="container py-8">
+        <Button variant="ghost" asChild className="mb-4 -ml-4">
+          <Link href="/dashboard/teacher">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Teacher Dashboard
+          </Link>
+        </Button>
+        <div className="mb-6">
+            <h1 className="text-3xl font-bold tracking-tighter font-headline">Manage Enrollments</h1>
+            <p className="text-muted-foreground">Course: <span className="font-semibold text-foreground">{course?.title}</span></p>
+        </div>
+        
+        <div className="grid lg:grid-cols-3 gap-8 items-start">
+            <div className="lg:col-span-1">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Add Student</CardTitle>
+                        <CardDescription>Enter the email of the student you want to enroll.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Form {...form}>
+                            <form onSubmit={form.handleSubmit(handleAddStudent)} className="space-y-4">
+                                <FormField control={form.control} name="email" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Student Email</FormLabel>
+                                        <FormControl><Input placeholder="student@example.com" {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )} />
+                                <Button type="submit" disabled={submitting} className="w-full">
+                                    {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+                                    Enroll Student
+                                </Button>
+                            </form>
+                        </Form>
+                    </CardContent>
+                </Card>
+            </div>
+            <div className="lg:col-span-2">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Enrolled Students</CardTitle>
+                        <CardDescription>
+                          {enrollments.length > 0 
+                            ? `There are ${enrollments.length} student(s) enrolled in this course.`
+                            : "No students are enrolled in this course yet."
+                          }
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {enrollments.length > 0 ? (
+                             <div className="border rounded-md">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Name</TableHead>
+                                            <TableHead>Email</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {enrollments.map((enrollment) => (
+                                            <TableRow key={enrollment.id}>
+                                                <TableCell className="font-medium">{enrollment.studentName}</TableCell>
+                                                <TableCell>{enrollment.studentEmail}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <Button variant="ghost" size="icon" onClick={() => handleRemoveClick(enrollment)} title="Remove Student">
+                                                        <Trash2 className="h-4 w-4" />
+                                                        <span className="sr-only">Remove</span>
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                             </div>
+                        ) : (
+                            <div className="text-center py-10">
+                                <p className="text-muted-foreground">Use the form to add your first student.</p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
+      </div>
+    </>
+  );
+}

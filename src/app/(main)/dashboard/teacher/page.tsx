@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Loader2, Edit, Trash2 } from "lucide-react";
+import { PlusCircle, Loader2, Edit, Trash2, Users } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -164,15 +164,21 @@ export default function TeacherDashboardPage() {
                           <TableCell className="hidden sm:table-cell"><Badge variant="secondary">{course.category}</Badge></TableCell>
                           <TableCell className="text-right hidden md:table-cell">${course.price.toFixed(2)}</TableCell>
                           <TableCell className="text-right">
-                              <Button variant="ghost" size="icon" asChild>
+                              <Button variant="ghost" size="icon" asChild title="Manage Students">
+                                <Link href={`/dashboard/teacher/enrollments/${course.id}`}>
+                                    <Users className="h-4 w-4" />
+                                    <span className="sr-only">Manage Students</span>
+                                </Link>
+                              </Button>
+                              <Button variant="ghost" size="icon" asChild title="Edit Course">
                                   <Link href={`/dashboard/teacher/edit/${course.id}`}>
                                       <Edit className="h-4 w-4" />
-                                      <span className="sr-only">Edit</span>
+                                      <span className="sr-only">Edit Course</span>
                                   </Link>
                               </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(course)}>
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(course)} title="Delete Course">
                                   <Trash2 className="h-4 w-4" />
-                                  <span className="sr-only">Delete</span>
+                                  <span className="sr-only">Delete Course</span>
                               </Button>
                           </TableCell>
                         </TableRow>
