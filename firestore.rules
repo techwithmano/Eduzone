@@ -1,0 +1,43 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    match /contacts/{documentId} {
+      allow create: if true;
+    }
+
+    match /products/{productId} {
+      // Any authenticated user can read course/product details.
+      allow read: if request.auth != null;
+      // Only teachers can create, update, or delete courses.
+      allow create, update, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
+    }
+    
+    match /users/{userId} {
+      // A user can read their OWN document.
+      allow get: if request.auth.uid == userId;
+      // A teacher can search the list of users (e.g., to enroll them).
+      allow list: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
+      // A new user can create their OWN document.
+      allow create: if request.auth.uid == userId;
+    }
+    
+    match /enrollments/{enrollmentId} {
+      // A teacher can read any enrollment document.
+      // A student can only read their OWN enrollment document.
+      allow get: if request.auth != null && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER' ||
+        resource.data.studentId == request.auth.uid);
+        
+      // A teacher can query the whole enrollments list.
+      // A student can ONLY query the list if they are filtering by their own ID.
+      allow list: if request.auth != null &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER' ||
+         request.query.where.studentId == request.auth.uid);
+      
+      // Only teachers can create or delete enrollments.
+      allow create, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
+    }
+  }
+}
