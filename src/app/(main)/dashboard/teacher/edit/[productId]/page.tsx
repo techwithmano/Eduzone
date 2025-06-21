@@ -21,7 +21,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 
-const productSchema = z.object({
+const courseSchema = z.object({
   title: z.string().min(5, { message: "Title must be at least 5 characters." }),
   description: z.string().min(20, { message: "Description must be at least 20 characters." }),
   price: z.coerce.number().min(0, { message: "Price must be a positive number." }),
@@ -32,16 +32,16 @@ const productSchema = z.object({
 const categories = ["Course", "Notes", "Mock Exam", "Worksheet"];
 const subjects = ["Math", "Programming", "History", "Science", "English"];
 
-export default function EditProductPage() {
+export default function EditCoursePage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
-  const productId = params.productId as string;
+  const courseId = params.productId as string;
 
-  const form = useForm<z.infer<typeof productSchema>>({
-    resolver: zodResolver(productSchema),
+  const form = useForm<z.infer<typeof courseSchema>>({
+    resolver: zodResolver(courseSchema),
     defaultValues: {
       title: "",
       description: "",
@@ -52,47 +52,47 @@ export default function EditProductPage() {
   });
   
   useEffect(() => {
-    if (!productId) return;
+    if (!courseId) return;
 
-    const fetchProductData = async () => {
+    const fetchCourseData = async () => {
       try {
-        const productDocRef = doc(db, "products", productId);
-        const productDoc = await getDoc(productDocRef);
+        const courseDocRef = doc(db, "products", courseId);
+        const courseDoc = await getDoc(courseDocRef);
 
-        if (productDoc.exists()) {
-          const productData = productDoc.data();
-          form.reset(productData);
+        if (courseDoc.exists()) {
+          const courseData = courseDoc.data();
+          form.reset(courseData);
         } else {
-          toast({ variant: "destructive", title: "Product not found" });
+          toast({ variant: "destructive", title: "Course not found" });
           router.push("/dashboard/teacher");
         }
       } catch (error) {
-        console.error("Error fetching product data:", error);
-        toast({ variant: "destructive", title: "Failed to load product data" });
+        console.error("Error fetching course data:", error);
+        toast({ variant: "destructive", title: "Failed to load course data" });
       } finally {
         setLoading(false);
       }
     };
     
-    fetchProductData();
-  }, [productId, form, router, toast]);
+    fetchCourseData();
+  }, [courseId, form, router, toast]);
 
-  const onSubmit = async (values: z.infer<typeof productSchema>) => {
+  const onSubmit = async (values: z.infer<typeof courseSchema>) => {
     setSubmitting(true);
     try {
-        const productDocRef = doc(db, "products", productId);
-        await updateDoc(productDocRef, values);
+        const courseDocRef = doc(db, "products", courseId);
+        await updateDoc(courseDocRef, values);
         toast({
-          title: "Product Updated!",
-          description: "Your product has been successfully updated.",
+          title: "Course Updated!",
+          description: "Your course has been successfully updated.",
         })
         router.push("/dashboard/teacher");
     } catch(error) {
-        console.error("Error updating product: ", error);
+        console.error("Error updating course: ", error);
         toast({
             variant: "destructive",
             title: "Uh oh! Something went wrong.",
-            description: "There was a problem updating your product. Please try again.",
+            description: "There was a problem updating your course. Please try again.",
         })
     } finally {
         setSubmitting(false);
@@ -151,7 +151,7 @@ export default function EditProductPage() {
             </Button>
             <Card>
                 <CardHeader>
-                    <CardTitle>Edit Product</CardTitle>
+                    <CardTitle>Edit Course</CardTitle>
                     <CardDescription>Update the details for your course or resource.</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -159,7 +159,7 @@ export default function EditProductPage() {
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                             <FormField control={form.control} name="title" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Product Title</FormLabel>
+                                    <FormLabel>Course Title</FormLabel>
                                     <FormControl><Input placeholder="e.g., Introduction to Algebra" {...field} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -167,8 +167,8 @@ export default function EditProductPage() {
 
                             <FormField control={form.control} name="description" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Product Description</FormLabel>
-                                    <FormControl><Textarea placeholder="Describe the product in detail..." className="min-h-[120px] resize-y" {...field} /></FormControl>
+                                    <FormLabel>Course Description</FormLabel>
+                                    <FormControl><Textarea placeholder="Describe the course in detail..." className="min-h-[120px] resize-y" {...field} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )} />

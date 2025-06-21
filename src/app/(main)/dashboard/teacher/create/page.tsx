@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -20,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
 
-const productSchema = z.object({
+const courseSchema = z.object({
   title: z.string().min(5, { message: "Title must be at least 5 characters." }),
   description: z.string().min(20, { message: "Description must be at least 20 characters." }),
   price: z.coerce.number().min(0, { message: "Price must be a positive number." }),
@@ -31,14 +32,14 @@ const productSchema = z.object({
 const categories = ["Course", "Notes", "Mock Exam", "Worksheet"];
 const subjects = ["Math", "Programming", "History", "Science", "English"];
 
-export default function CreateProductPage() {
+export default function CreateCoursePage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const form = useForm<z.infer<typeof productSchema>>({
-    resolver: zodResolver(productSchema),
+  const form = useForm<z.infer<typeof courseSchema>>({
+    resolver: zodResolver(courseSchema),
     defaultValues: {
       title: "",
       description: "",
@@ -46,9 +47,9 @@ export default function CreateProductPage() {
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof productSchema>) => {
+  const onSubmit = async (values: z.infer<typeof courseSchema>) => {
     if (!user) {
-        toast({ variant: "destructive", title: "You must be logged in to create a product." });
+        toast({ variant: "destructive", title: "You must be logged in to create a course." });
         return;
     }
     setLoading(true);
@@ -61,16 +62,16 @@ export default function CreateProductPage() {
             createdAt: serverTimestamp(),
         });
         toast({
-          title: "Product Created!",
-          description: "Your new product has been added to the store.",
+          title: "Course Created!",
+          description: "Your new course has been added.",
         })
         router.push("/dashboard/teacher");
     } catch(error) {
-        console.error("Error creating product: ", error);
+        console.error("Error creating course: ", error);
         toast({
             variant: "destructive",
             title: "Uh oh! Something went wrong.",
-            description: "There was a problem creating your product. Please try again.",
+            description: "There was a problem creating your course. Please try again.",
         })
     } finally {
         setLoading(false);
@@ -88,15 +89,15 @@ export default function CreateProductPage() {
             </Button>
             <Card>
                 <CardHeader>
-                    <CardTitle>Create a New Product</CardTitle>
-                    <CardDescription>Fill out the form below to add a new course or resource to the store.</CardDescription>
+                    <CardTitle>Create a New Course</CardTitle>
+                    <CardDescription>Fill out the form below to create a new course.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                             <FormField control={form.control} name="title" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Product Title</FormLabel>
+                                    <FormLabel>Course Title</FormLabel>
                                     <FormControl><Input placeholder="e.g., Introduction to Algebra" {...field} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -104,8 +105,8 @@ export default function CreateProductPage() {
 
                             <FormField control={form.control} name="description" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Product Description</FormLabel>
-                                    <FormControl><Textarea placeholder="Describe the product in detail..." className="min-h-[120px] resize-y" {...field} /></FormControl>
+                                    <FormLabel>Course Description</FormLabel>
+                                    <FormControl><Textarea placeholder="Describe the course in detail..." className="min-h-[120px] resize-y" {...field} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )} />
@@ -152,7 +153,7 @@ export default function CreateProductPage() {
 
                             <Button type="submit" disabled={loading} className="w-full">
                                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Create Product
+                                Create Course
                             </Button>
                         </form>
                     </Form>

@@ -9,57 +9,57 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { useAuth } from "@/components/providers/auth-provider";
 
-import { type Product } from "@/components/product-card";
+import { type Course } from "@/components/product-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, ShoppingCart } from "lucide-react";
 
-export default function ProductPage() {
+export default function CoursePage() {
     const params = useParams();
     const router = useRouter();
     const { user } = useAuth();
     const { toast } = useToast();
-    const productId = params.productId as string;
+    const courseId = params.productId as string;
 
-    const [product, setProduct] = useState<Product | null>(null);
+    const [course, setCourse] = useState<Course | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!productId) return;
+        if (!courseId) return;
         
-        const fetchProduct = async () => {
+        const fetchCourse = async () => {
             setLoading(true);
             try {
-                const productDocRef = doc(db, "products", productId);
-                const productDoc = await getDoc(productDocRef);
+                const courseDocRef = doc(db, "products", courseId);
+                const courseDoc = await getDoc(courseDocRef);
 
-                if (productDoc.exists()) {
-                    setProduct({ id: productDoc.id, ...productDoc.data() } as Product);
+                if (courseDoc.exists()) {
+                    setCourse({ id: courseDoc.id, ...courseDoc.data() } as Course);
                 } else {
                     console.error("No such document!");
                     toast({
                         variant: "destructive",
-                        title: "Product not found",
-                        description: "Redirecting you back to the store.",
+                        title: "Course not found",
+                        description: "Redirecting you back to the marketplace.",
                     });
                     router.push('/store');
                 }
             } catch (error) {
-                console.error("Error fetching product:", error);
+                console.error("Error fetching course:", error);
                  toast({
                     variant: "destructive",
                     title: "Error",
-                    description: "Could not fetch product details.",
+                    description: "Could not fetch course details.",
                 });
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchProduct();
-    }, [productId, router, toast]);
+        fetchCourse();
+    }, [courseId, router, toast]);
 
     const handleBuyNow = () => {
         if (!user) {
@@ -93,15 +93,15 @@ export default function ProductPage() {
         );
     }
 
-    if (!product) {
+    if (!course) {
         return (
             <div className="container text-center py-20">
-                <h1 className="text-2xl font-bold">Product not found</h1>
-                <p className="text-muted-foreground">The product you were looking for does not exist.</p>
+                <h1 className="text-2xl font-bold">Course not found</h1>
+                <p className="text-muted-foreground">The course you were looking for does not exist.</p>
                 <Button asChild className="mt-4">
                     <Link href="/store">
                         <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to Store
+                        Back to Marketplace
                     </Link>
                 </Button>
             </div>
@@ -114,14 +114,14 @@ export default function ProductPage() {
                 <Button variant="ghost" asChild className="mb-8">
                     <Link href="/store">
                         <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to Store
+                        Back to Marketplace
                     </Link>
                 </Button>
                 <div className="grid md:grid-cols-2 gap-8 md:gap-12">
                     <div className="relative aspect-video">
                          <Image
-                            src={product.imageUrl}
-                            alt={product.title}
+                            src={course.imageUrl}
+                            alt={course.title}
                             fill
                             className="object-cover rounded-lg border"
                             data-ai-hint="course thumbnail"
@@ -130,13 +130,13 @@ export default function ProductPage() {
                     <div className="space-y-4">
                         <div className="space-y-2">
                             <div className="flex gap-2">
-                                <Badge variant="secondary">{product.category}</Badge>
-                                <Badge variant="outline">{product.subject}</Badge>
+                                <Badge variant="secondary">{course.category}</Badge>
+                                <Badge variant="outline">{course.subject}</Badge>
                             </div>
-                            <h1 className="text-3xl md:text-4xl font-bold font-headline">{product.title}</h1>
+                            <h1 className="text-3xl md:text-4xl font-bold font-headline">{course.title}</h1>
                         </div>
-                        <p className="text-muted-foreground text-lg">{product.description}</p>
-                        <p className="text-4xl font-bold text-primary">${product.price.toFixed(2)}</p>
+                        <p className="text-muted-foreground text-lg">{course.description}</p>
+                        <p className="text-4xl font-bold text-primary">${course.price.toFixed(2)}</p>
                         <Button size="lg" onClick={handleBuyNow}>
                             <ShoppingCart className="mr-2 h-5 w-5" />
                             Buy Now

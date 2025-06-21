@@ -7,7 +7,7 @@ import { db } from "@/lib/firebase/client";
 
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ProductCard, type Product } from "@/components/product-card";
+import { CourseCard, type Course } from "@/components/product-card";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search } from "lucide-react";
@@ -15,7 +15,7 @@ import { Search } from "lucide-react";
 const categories = ["All", "Course", "Notes", "Mock Exam", "Worksheet"];
 const subjects = ["All", "Math", "Programming", "History", "Science", "English"];
 
-const ProductCardSkeleton = () => (
+const CourseCardSkeleton = () => (
   <Card>
     <CardHeader className="p-0">
       <Skeleton className="aspect-video w-full rounded-t-lg" />
@@ -35,19 +35,19 @@ const ProductCardSkeleton = () => (
 
 
 export default function StorePage() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [category, setCategory] = useState("All");
   const [subject, setSubject] = useState("All");
 
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchCourses = async () => {
       setLoading(true);
       try {
-        const productsCollection = collection(db, "products");
-        const productSnapshot = await getDocs(productsCollection);
-        const productList = productSnapshot.docs.map(doc => {
+        const coursesCollection = collection(db, "products");
+        const courseSnapshot = await getDocs(coursesCollection);
+        const courseList = courseSnapshot.docs.map(doc => {
           const data = doc.data();
           return {
             id: doc.id,
@@ -58,34 +58,34 @@ export default function StorePage() {
             category: data.category,
             subject: data.subject,
           }
-        }) as Product[];
-        setProducts(productList);
+        }) as Course[];
+        setCourses(courseList);
       } catch (error) {
-        console.error("Error fetching products: ", error);
+        console.error("Error fetching courses: ", error);
         // In a real app, you might want to show a toast notification here
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProducts();
+    fetchCourses();
   }, []);
 
-  const filteredProducts = useMemo(() => {
-    return products.filter(product => {
-      const searchMatch = product.title.toLowerCase().includes(searchTerm.toLowerCase()) || product.description.toLowerCase().includes(searchTerm.toLowerCase());
-      const categoryMatch = category === "All" || product.category === category;
-      const subjectMatch = subject === "All" || product.subject === subject;
+  const filteredCourses = useMemo(() => {
+    return courses.filter(course => {
+      const searchMatch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) || course.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const categoryMatch = category === "All" || course.category === category;
+      const subjectMatch = subject === "All" || course.subject === subject;
       return searchMatch && categoryMatch && subjectMatch;
     });
-  }, [products, searchTerm, category, subject]);
+  }, [courses, searchTerm, category, subject]);
 
   return (
     <div className="bg-background text-foreground">
       <section className="w-full py-12 md:py-16 bg-secondary">
         <div className="container px-4 md:px-6">
           <div className="text-center space-y-3">
-            <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl font-headline">EduZone Store</h1>
+            <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl font-headline">Course Marketplace</h1>
             <p className="max-w-[700px] mx-auto text-muted-foreground md:text-xl">
               Browse our curated collection of courses and educational resources.
             </p>
@@ -128,19 +128,19 @@ export default function StorePage() {
         {loading ? (
            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {Array.from({ length: 8 }).map((_, i) => (
-              <ProductCardSkeleton key={i} />
+              <CourseCardSkeleton key={i} />
             ))}
            </div>
-        ) : filteredProducts.length > 0 ? (
+        ) : filteredCourses.length > 0 ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProducts.map(product => (
-              <ProductCard key={product.id} product={product} />
+            {filteredCourses.map(course => (
+              <CourseCard key={course.id} course={course} />
             ))}
           </div>
         ) : (
           <div className="text-center py-16">
-            <h2 className="text-2xl font-semibold mb-2">No Products Found</h2>
-            <p className="text-muted-foreground">Try adjusting your search or filters. You may also need to add products to the database.</p>
+            <h2 className="text-2xl font-semibold mb-2">No Courses Found</h2>
+            <p className="text-muted-foreground">Try adjusting your search or filters. You may also need to add courses to the database.</p>
           </div>
         )}
       </div>
