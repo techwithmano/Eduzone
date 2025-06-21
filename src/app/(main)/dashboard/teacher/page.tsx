@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
@@ -12,57 +13,54 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Loader2 } from "lucide-react";
 
 type TeacherProduct = Product & { creatorName?: string };
 
 export default function TeacherDashboardPage() {
   const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [products, setProducts] = useState<TeacherProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      const fetchProducts = async () => {
-        setLoading(true);
-        try {
-          const q = query(collection(db, "products"), where("creatorId", "==", user.uid), orderBy("createdAt", "desc"));
-          const querySnapshot = await getDocs(q);
-          const userProducts = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as TeacherProduct[];
-          setProducts(userProducts);
-        } catch (error) {
-          console.error("Error fetching user products: ", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchProducts();
+    if (authLoading) return; // Wait for auth to finish loading
+    if (!user) {
+      router.push("/auth"); // Redirect if not logged in
+      return;
     }
-  }, [user]);
+    if (user.role !== "TEACHER") {
+      router.push("/dashboard"); // Redirect if not a teacher
+      return;
+    }
 
-  if (authLoading) {
+    const fetchProducts = async () => {
+      setLoading(true);
+      try {
+        const q = query(collection(db, "products"), where("creatorId", "==", user.uid), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        const userProducts = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as TeacherProduct[];
+        setProducts(userProducts);
+      } catch (error) {
+        console.error("Error fetching user products: ", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProducts();
+  }, [user, authLoading, router]);
+
+  if (authLoading || loading) {
     return (
-       <div className="container py-8">
-        <div className="flex justify-between items-center mb-6">
-            <Skeleton className="h-8 w-64" />
-            <Skeleton className="h-10 w-48" />
-        </div>
-        <Card>
-            <CardHeader><Skeleton className="h-6 w-48" /></CardHeader>
-            <CardContent>
-                <div className="space-y-2">
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                </div>
-            </CardContent>
-        </Card>
+      <div className="flex h-[calc(100vh-theme(spacing.14))] w-full items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
 
-  if (!user) {
-      return <div className="container py-8"><p>Please log in to view the teacher dashboard.</p></div>
+  if (!user || user.role !== 'TEACHER') {
+    // This is a fallback while redirecting
+    return null;
   }
 
   return (
@@ -87,13 +85,7 @@ export default function TeacherDashboardPage() {
           <CardDescription>A list of all the products you have created.</CardDescription>
         </CardHeader>
         <CardContent>
-            {loading ? (
-                 <div className="space-y-2">
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                </div>
-            ) : products.length > 0 ? (
+            {products.length > 0 ? (
              <div className="border rounded-md">
                 <Table>
                     <TableHeader>

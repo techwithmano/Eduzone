@@ -3,76 +3,43 @@
 import { useAuth } from "@/components/providers/auth-provider";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Loader2 } from "lucide-react";
 
-export default function DashboardPage() {
+export default function DashboardRedirectPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
+    // Wait until loading is finished
+    if (loading) {
+      return;
+    }
+
+    // If there is no user, send to login page
+    if (!user) {
       router.push("/auth");
+      return;
+    }
+
+    // Redirect based on role
+    if (user.role === "TEACHER") {
+      router.push("/dashboard/teacher");
+    } else if (user.role === "STUDENT") {
+      router.push("/dashboard/student");
+    } else {
+      // Fallback for users with no role or other roles
+      // For now, we can send them to the home page.
+      router.push("/");
     }
   }, [user, loading, router]);
 
-  if (loading) {
-    return (
-      <div className="container py-8">
-        <div className="space-y-4">
-          <Skeleton className="h-8 w-48" />
-          <div className="grid md:grid-cols-2 gap-6">
-            <Skeleton className="h-40 w-full" />
-            <Skeleton className="h-40 w-full" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
-
+  // Show a loading state while we redirect the user
   return (
-    <div className="container py-8">
-      <div className="space-y-4 mb-6">
-        <div className="flex items-center gap-4">
-          <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl font-headline">
-            Welcome, {user.displayName || user.email}!
-          </h1>
-          {user.role && <Badge variant="secondary">{user.role}</Badge>}
-        </div>
-        <p className="text-muted-foreground">This is your personal dashboard. Manage your learning and teaching here.</p>
-      </div>
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Student Dashboard</CardTitle>
-            <CardDescription>
-              Access your courses, track your progress, and continue learning.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p>Your enrolled courses will appear here soon!</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Teacher Portal</CardTitle>
-            <CardDescription>
-              Create and manage your courses and educational materials.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link href="/dashboard/teacher">Go to Teacher Portal</Link>
-            </Button>
-          </CardContent>
-        </Card>
+    <div className="flex h-screen w-full items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground">Preparing your dashboard...</p>
       </div>
     </div>
   );
