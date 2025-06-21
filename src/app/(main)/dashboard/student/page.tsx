@@ -116,7 +116,7 @@ export default function StudentDashboardPage() {
             <CardDescription>
               Keep track of what's due next.
             </CardDescription>
-          </Header>
+          </CardHeader>
           <CardContent>
             <p>No upcoming assignments.</p>
           </CardContent>
