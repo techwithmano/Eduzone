@@ -10,7 +10,9 @@ import {
   signInWithEmailAndPassword,
   updateProfile,
 } from "firebase/auth";
-import { auth } from "@/lib/firebase/client";
+import { doc, setDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase/client";
+
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,7 +83,19 @@ export function AuthForm() {
         values.email,
         values.password
       );
-      await updateProfile(userCredential.user, { displayName: values.name });
+      
+      const user = userCredential.user;
+      await updateProfile(user, { displayName: values.name });
+
+      // Create a user document in Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        displayName: values.name,
+        email: values.email,
+        role: "STUDENT", // All sign-ups are students
+        createdAt: new Date(),
+      });
+
       toast({ title: "Sign up successful!" });
       router.push("/dashboard");
     } catch (error: any) {
@@ -99,7 +113,7 @@ export function AuthForm() {
     <Tabs defaultValue="login" className="w-full">
       <TabsList className="grid w-full grid-cols-2">
         <TabsTrigger value="login">Login</TabsTrigger>
-        <TabsTrigger value="signup">Sign Up</TabsTrigger>
+        <TabsTrigger value="signup">Student Sign Up</TabsTrigger>
       </TabsList>
       <TabsContent value="login">
         <Form {...loginForm}>
