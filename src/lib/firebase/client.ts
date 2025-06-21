@@ -3,14 +3,15 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
-// IMPORTANT: Replace this with your actual Firebase project configuration
+// IMPORTANT: This is a temporary solution for debugging.
+// Do not commit these keys to a public repository.
 const firebaseConfig: FirebaseOptions = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: "AIzaSyADfsnnbZgVlNaZA4Pp9TZMZ0NQTjIRxkU",
+  authDomain: "eduzone-bcd0d.firebaseapp.com",
+  projectId: "eduzone-bcd0d",
+  storageBucket: "eduzone-bcd0d.firebasestorage.app",
+  messagingSenderId: "275950737621",
+  appId: "1:275950737621:web:09572e6bc125d7666aea5c",
 };
 
 // Initialize Firebase
