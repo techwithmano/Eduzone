@@ -8,31 +8,11 @@ import { db } from "@/lib/firebase/client";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CourseCard, type Course } from "@/components/product-card";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Search } from "lucide-react";
+import { CourseCardSkeleton } from "@/components/course-card-skeleton";
 
 const categories = ["All", "Course", "Notes", "Mock Exam", "Worksheet"];
 const subjects = ["All", "Math", "Programming", "History", "Science", "English"];
-
-const CourseCardSkeleton = () => (
-  <Card>
-    <CardHeader className="p-0">
-      <Skeleton className="aspect-video w-full rounded-t-lg" />
-    </CardHeader>
-    <CardContent className="p-4 space-y-2">
-      <Skeleton className="h-4 w-1/4" />
-      <Skeleton className="h-5 w-3/4" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-4 w-5/6" />
-    </CardContent>
-    <CardFooter className="p-4 flex justify-between items-center">
-      <Skeleton className="h-8 w-1/4" />
-      <Skeleton className="h-10 w-1/3" />
-    </CardFooter>
-  </Card>
-);
-
 
 export default function StorePage() {
   const [courses, setCourses] = useState<Course[]>([]);
