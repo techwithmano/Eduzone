@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Icons } from "@/components/icons";
+import { AuthForm } from "@/components/auth/auth-form";
 
 export default function AuthPage() {
     return (
@@ -12,14 +13,8 @@ export default function AuthPage() {
                 </Link>
              </div>
              <Card className="w-full max-w-md">
-                <CardHeader className="text-center">
-                    <CardTitle className="text-2xl font-headline">Coming Soon!</CardTitle>
-                    <CardDescription>Our authentication system is being built. Please check back later.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-center text-muted-foreground">
-                        <p>This page will contain the login and signup forms for students and teachers.</p>
-                    </div>
+                <CardContent className="p-6">
+                    <AuthForm />
                 </CardContent>
              </Card>
         </div>

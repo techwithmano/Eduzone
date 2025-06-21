@@ -2,22 +2,33 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, BookOpenCheck } from "lucide-react";
+import { Menu } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Icons } from "@/components/icons";
-
-const navItems = [
-  { label: "Home", href: "/" },
-  { label: "About", href: "/about" },
-  { label: "Store", href: "/store" },
-  { label: "Contact", href: "/contact" },
-];
+import { useAuth } from "@/components/providers/auth-provider";
+import { UserNav } from "@/components/auth/user-nav";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function Header() {
   const pathname = usePathname();
+  const { user, loading } = useAuth();
+  
+  const navItems = [
+    { label: "Home", href: "/" },
+    { label: "About", href: "/about" },
+    { label: "Store", href: "/store" },
+    { label: "Contact", href: "/contact" },
+  ];
+  
+  const loggedInNavItems = [
+    ...navItems,
+    { label: "Dashboard", href: "/dashboard" },
+  ];
+
+  const currentNavItems = user ? loggedInNavItems : navItems;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -28,7 +39,7 @@ export function Header() {
             <span className="hidden font-bold sm:inline-block">EduZone</span>
           </Link>
           <nav className="flex items-center gap-6 text-sm">
-            {navItems.map((item) => (
+            {currentNavItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -63,7 +74,7 @@ export function Header() {
               <span className="font-bold">EduZone</span>
             </Link>
             <div className="flex flex-col space-y-3">
-              {navItems.map((item) => (
+              {currentNavItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
@@ -78,18 +89,21 @@ export function Header() {
             </div>
           </SheetContent>
         </Sheet>
-        <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-          <div className="w-full flex-1 md:w-auto md:flex-none">
-            {/* Can add a command menu here in the future */}
-          </div>
-          <nav className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm">
-                <Link href="/auth">Login</Link>
-            </Button>
-            <Button asChild size="sm">
-                <Link href="/auth">Sign Up</Link>
-            </Button>
-          </nav>
+        <div className="flex flex-1 items-center justify-end space-x-2">
+          {loading ? (
+            <Skeleton className="h-8 w-20" />
+          ) : user ? (
+            <UserNav />
+          ) : (
+            <nav className="flex items-center gap-2">
+              <Button asChild variant="ghost" size="sm">
+                  <Link href="/auth">Login</Link>
+              </Button>
+              <Button asChild size="sm">
+                  <Link href="/auth">Sign Up</Link>
+              </Button>
+            </nav>
+          )}
         </div>
       </div>
     </header>
