@@ -24,12 +24,15 @@ export type Classroom = {
   createdAt: Timestamp;
 };
 
-export type Product = {
-  id: string;
+export type StoreItem = {
+  id: number;
   title: string;
-  description: string;
+  category: string;
+  language: string;
+  priceKWD: number;
   imageUrl: string;
-  subject: string;
+  description: string;
+  dataAiHint: string;
 };
 
 export type Announcement = {

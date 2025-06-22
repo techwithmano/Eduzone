@@ -1,60 +1,36 @@
 
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase/client";
+import { useState, useMemo } from "react";
+import { storeItems } from "@/lib/store-data";
 
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductCard } from "@/components/product-card";
-import { type Product } from "@/lib/types";
 import { Search } from "lucide-react";
-import { CourseCardSkeleton } from "@/components/course-card-skeleton";
 
-const subjects = ["All", "Math", "Programming", "History", "Science", "English", "Art", "Music"];
+const categories = ["All", ...Array.from(new Set(storeItems.map(item => item.category)))];
 
 export default function StorePage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [subject, setSubject] = useState("All");
+  const [category, setCategory] = useState("All");
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true);
-      try {
-        const productsCollection = collection(db, "products");
-        const productSnapshot = await getDocs(productsCollection);
-        const productList = productSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-        setProducts(productList);
-      } catch (error) {
-        console.error("Error fetching products: ", error);
-        // In a real app, you might want to show a toast notification here
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProducts();
-  }, []);
-
-  const filteredProducts = useMemo(() => {
-    return products.filter(product => {
-      const searchMatch = product.title.toLowerCase().includes(searchTerm.toLowerCase()) || product.description.toLowerCase().includes(searchTerm.toLowerCase());
-      const subjectMatch = subject === "All" || product.subject === subject;
-      return searchMatch && subjectMatch;
+  const filteredItems = useMemo(() => {
+    return storeItems.filter(item => {
+      const searchMatch = item.title.toLowerCase().includes(searchTerm.toLowerCase());
+      const categoryMatch = category === "All" || item.category === category;
+      return searchMatch && categoryMatch;
     });
-  }, [products, searchTerm, subject]);
+  }, [searchTerm, category]);
 
   return (
     <div className="bg-background text-foreground">
       <section className="w-full py-12 md:py-16 bg-secondary">
         <div className="container px-4 md:px-6">
           <div className="text-center space-y-3">
-            <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl font-headline">Browse Our Store</h1>
+            <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl font-headline">Browse Our Courses</h1>
             <p className="max-w-[700px] mx-auto text-muted-foreground md:text-xl">
-              Find notes, materials, and other educational resources.
+              Find foundation courses, tutoring, exam prep, and language classes.
             </p>
           </div>
         </div>
@@ -65,40 +41,33 @@ export default function StorePage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
-              placeholder="Search for products..."
+              placeholder="Search for courses..."
               className="pl-10"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              disabled={loading}
             />
           </div>
           <div className="flex gap-4">
-            <Select value={subject} onValueChange={setSubject} disabled={loading}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Subject" />
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger className="w-full md:w-[220px]">
+                <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
-                {subjects.map(sub => <SelectItem key={sub} value={sub}>{sub}</SelectItem>)}
+                {categories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
         </div>
 
-        {loading ? (
-           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <CourseCardSkeleton key={i} />
-            ))}
-           </div>
-        ) : filteredProducts.length > 0 ? (
+        {filteredItems.length > 0 ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProducts.map(product => (
-              <ProductCard key={product.id} product={product} />
+            {filteredItems.map(item => (
+              <ProductCard key={item.id} item={item} />
             ))}
           </div>
         ) : (
           <div className="text-center py-16">
-            <h2 className="text-2xl font-semibold mb-2">No Products Found</h2>
+            <h2 className="text-2xl font-semibold mb-2">No Courses Found</h2>
             <p className="text-muted-foreground">Try adjusting your search or filters.</p>
           </div>
         )}
