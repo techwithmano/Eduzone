@@ -29,7 +29,7 @@ export function AnnouncementCard({ announcement, onDelete }: AnnouncementCardPro
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="flex justify-between items-start">
+        <div className="flex justify-between items-start gap-4">
             <div className="flex-1 space-y-1">
                 <p className="text-sm font-semibold">{announcement.authorName}</p>
                 <p className="text-xs text-muted-foreground capitalize">{formattedDate}</p>

@@ -51,38 +51,39 @@ export default function AboutPage() {
         <div className="container px-4 md:px-6">
           <h2 className="text-3xl font-bold tracking-tighter text-center mb-10 font-headline">Our Journey</h2>
           <div className="relative">
-             <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-border -translate-x-1/2"></div>
-             <div className="space-y-16">
-                <div className="relative flex items-center">
-                    <div className="w-1/2 pr-8 text-right">
+             <div className="absolute left-4 md:left-1/2 top-0 bottom-0 w-0.5 bg-border md:-translate-x-1/2"></div>
+             <div className="space-y-8 md:space-y-16">
+                
+                <div className="relative">
+                    <div className="absolute top-1 left-4 -translate-x-1/2 bg-primary h-4 w-4 rounded-full border-4 border-background md:left-1/2"></div>
+                    <div className="pl-10 md:pl-0 md:w-1/2 md:pr-8 md:text-right">
                         <div className="p-4 bg-background rounded-lg shadow-md">
                             <h3 className="font-bold">2022 - The Idea</h3>
                             <p className="text-sm text-muted-foreground">EduZone was born from a desire to simplify digital education for teachers and students.</p>
                         </div>
                     </div>
-                    <div className="absolute left-1/2 -translate-x-1/2 bg-primary h-4 w-4 rounded-full border-4 border-background"></div>
-                    <div className="w-1/2 pl-8"></div>
                 </div>
-                 <div className="relative flex items-center">
-                    <div className="w-1/2 pr-8"></div>
-                     <div className="absolute left-1/2 -translate-x-1/2 bg-primary h-4 w-4 rounded-full border-4 border-background"></div>
-                    <div className="w-1/2 pl-8 text-left">
+
+                 <div className="relative">
+                    <div className="absolute top-1 left-4 -translate-x-1/2 bg-primary h-4 w-4 rounded-full border-4 border-background md:left-1/2"></div>
+                    <div className="pl-10 md:pl-8 md:w-1/2 md:ml-[50%]">
                          <div className="p-4 bg-background rounded-lg shadow-md">
                             <h3 className="font-bold">2023 - First Launch</h3>
                             <p className="text-sm text-muted-foreground">We launched our beta platform to a select group of schools and gathered valuable feedback.</p>
                         </div>
                     </div>
                 </div>
-                <div className="relative flex items-center">
-                    <div className="w-1/2 pr-8 text-right">
+
+                <div className="relative">
+                    <div className="absolute top-1 left-4 -translate-x-1/2 bg-primary h-4 w-4 rounded-full border-4 border-background md:left-1/2"></div>
+                     <div className="pl-10 md:pl-0 md:w-1/2 md:pr-8 md:text-right">
                         <div className="p-4 bg-background rounded-lg shadow-md">
                             <h3 className="font-bold">2024 - AI Integration</h3>
                             <p className="text-sm text-muted-foreground">Introduced our AI-powered tool to help teachers create more engaging course content.</p>
                         </div>
                     </div>
-                     <div className="absolute left-1/2 -translate-x-1/2 bg-primary h-4 w-4 rounded-full border-4 border-background"></div>
-                    <div className="w-1/2 pl-8"></div>
                 </div>
+
              </div>
           </div>
         </div>
@@ -93,9 +94,9 @@ export default function AboutPage() {
           <h2 className="text-3xl font-bold tracking-tighter text-center mb-10 font-headline">A Glimpse into EduZone</h2>
            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Image src="https://placehold.co/400x400.png" alt="Classroom 1" width={400} height={400} className="rounded-lg object-cover aspect-square" data-ai-hint="classroom students" />
-              <Image src="https://placehold.co/400x400.png" alt="Classroom 2" width={400} height={400} className="rounded-lg object-cover aspect-square mt-8" data-ai-hint="teacher lecture" />
+              <Image src="https://placehold.co/400x400.png" alt="Classroom 2" width={400} height={400} className="rounded-lg object-cover aspect-square md:mt-8" data-ai-hint="teacher lecture" />
               <Image src="https://placehold.co/400x400.png" alt="Virtual Session" width={400} height={400} className="rounded-lg object-cover aspect-square" data-ai-hint="online learning" />
-              <Image src="https://placehold.co/400x400.png" alt="Collaboration" width={400} height={400} className="rounded-lg object-cover aspect-square mt-8" data-ai-hint="student collaboration" />
+              <Image src="https://placehold.co/400x400.png" alt="Collaboration" width={400} height={400} className="rounded-lg object-cover aspect-square md:mt-8" data-ai-hint="student collaboration" />
            </div>
         </div>
       </section>

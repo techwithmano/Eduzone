@@ -360,7 +360,7 @@ export default function AdminClassroomPage() {
         </div>
 
         <Tabs defaultValue="announcements" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-7 mb-6">
+          <TabsList className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7 mb-6">
             <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
             <TabsTrigger value="assignments"><FileText className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
             <TabsTrigger value="quizzes"><Notebook className="mr-2 h-4 w-4" />Quizzes</TabsTrigger>
@@ -518,7 +518,7 @@ export default function AdminClassroomPage() {
                                               </CardHeader>
                                               <CardContent className="space-y-4">
                                                   <FormField control={quizForm.control} name={`questions.${index}.question`} render={({ field }) => ( <FormItem><FormLabel>Question Text</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                                  <div className="grid grid-cols-2 gap-4">
+                                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                       {[0, 1, 2, 3].map(optionIndex => (
                                                           <FormField key={optionIndex} control={quizForm.control} name={`questions.${index}.options.${optionIndex}`} render={({ field }) => ( <FormItem><FormLabel>Option {optionIndex + 1}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                                                       ))}

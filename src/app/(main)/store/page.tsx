@@ -82,18 +82,18 @@ export default function StorePage() {
 
         {loading ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {Array.from({ length: 4 }).map((_, i) => (
+            {Array.from({ length: 8 }).map((_, i) => (
               <CourseCardSkeleton key={i} />
             ))}
           </div>
         ) : filteredItems.length > 0 ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredItems.map(item => (
               <ProductCard key={item.id} item={item} />
             ))}
           </div>
         ) : (
-          <div className="text-center py-16">
+          <div className="text-center py-16 col-span-full">
             <h2 className="text-2xl font-semibold mb-2">No Products Found</h2>
             <p className="text-muted-foreground">Try adjusting your search or filters, or check back later.</p>
           </div>

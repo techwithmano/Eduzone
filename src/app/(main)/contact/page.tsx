@@ -22,21 +22,21 @@ export default function ContactPage() {
                 <h2 className="text-2xl font-bold">Contact Information</h2>
                 <div className="space-y-4 text-muted-foreground">
                     <div className="flex items-start gap-4">
-                        <MapPin className="h-6 w-6 text-primary mt-1" />
+                        <MapPin className="h-6 w-6 text-primary mt-1 shrink-0" />
                         <div>
                             <h3 className="font-semibold text-foreground">Our Office</h3>
                             <p>123 Education Lane, Learning City, 12345</p>
                         </div>
                     </div>
                     <div className="flex items-start gap-4">
-                        <Mail className="h-6 w-6 text-primary mt-1" />
+                        <Mail className="h-6 w-6 text-primary mt-1 shrink-0" />
                         <div>
                             <h3 className="font-semibold text-foreground">Email Us</h3>
                             <p>support@eduzone.com</p>
                         </div>
                     </div>
                     <div className="flex items-start gap-4">
-                        <Phone className="h-6 w-6 text-primary mt-1" />
+                        <Phone className="h-6 w-6 text-primary mt-1 shrink-0" />
                         <div>
                             <h3 className="font-semibold text-foreground">Call Us</h3>
                             <p>+1 (555) 123-4567</p>
