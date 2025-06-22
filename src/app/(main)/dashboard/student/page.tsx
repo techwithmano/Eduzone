@@ -9,13 +9,13 @@ import { db } from "@/lib/firebase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
-import { CourseCard, type Course } from "@/components/product-card";
+import { ClassroomCard, type Classroom } from "@/components/product-card";
 import { CourseCardSkeleton } from "@/components/course-card-skeleton";
 
 export default function StudentDashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [courses, setCourses] = useState<Course[]>([]);
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,37 +29,35 @@ export default function StudentDashboardPage() {
       return;
     }
 
-    const fetchEnrolledCourses = async () => {
+    const fetchEnrolledClassrooms = async () => {
       if (!user) return;
       setLoading(true);
       try {
-        // 1. Get the student's user document
         const userDocRef = doc(db, "users", user.uid);
         const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists()) {
           const userData = userDoc.data();
-          const courseIds = userData.enrolledCourseIds || [];
+          const classroomIds = userData.enrolledCourseIds || [];
           
-          if (courseIds.length > 0) {
-            // 2. Fetch the courses using the array of IDs
-            const coursesQuery = query(collection(db, "products"), where(documentId(), "in", courseIds));
-            const coursesSnapshot = await getDocs(coursesQuery);
+          if (classroomIds.length > 0) {
+            const classroomsQuery = query(collection(db, "classrooms"), where(documentId(), "in", classroomIds));
+            const classroomsSnapshot = await getDocs(classroomsQuery);
             
-            const fetchedCourses = coursesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course));
-            setCourses(fetchedCourses);
+            const fetchedClassrooms = classroomsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classroom));
+            setClassrooms(fetchedClassrooms);
           } else {
-            setCourses([]);
+            setClassrooms([]);
           }
         }
       } catch (error) {
-        console.error("Error fetching enrolled courses: ", error);
+        console.error("Error fetching enrolled classrooms: ", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchEnrolledCourses();
+    fetchEnrolledClassrooms();
 
   }, [user, authLoading, router]);
 
@@ -84,7 +82,7 @@ export default function StudentDashboardPage() {
           </h1>
           {user.role && <Badge>{user.role}</Badge>}
         </div>
-        <p className="text-muted-foreground">Here are the courses you are currently enrolled in.</p>
+        <p className="text-muted-foreground">Here are the classrooms you are currently enrolled in.</p>
       </div>
       
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -94,14 +92,14 @@ export default function StudentDashboardPage() {
             <CourseCardSkeleton />
             <CourseCardSkeleton />
           </>
-        ) : courses.length > 0 ? (
-          courses.map(course => (
-            <CourseCard key={course.id} course={course} />
+        ) : classrooms.length > 0 ? (
+          classrooms.map(classroom => (
+            <ClassroomCard key={classroom.id} classroom={classroom} />
           ))
         ) : (
           <Card className="sm:col-span-2 lg:col-span-3">
             <CardContent className="p-10 text-center">
-              <p className="text-muted-foreground">You are not enrolled in any courses yet.</p>
+              <p className="text-muted-foreground">You are not enrolled in any classrooms yet.</p>
             </CardContent>
           </Card>
         )}

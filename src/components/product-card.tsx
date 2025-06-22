@@ -5,46 +5,42 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-export type Course = {
+export type Classroom = {
   id: string;
   title: string;
   description: string;
-  price: number;
   imageUrl: string;
-  category: string;
   subject: string;
 };
 
-interface CourseCardProps {
-  course: Course;
+interface ClassroomCardProps {
+  classroom: Classroom;
 }
 
-export function CourseCard({ course }: CourseCardProps) {
+export function ClassroomCard({ classroom }: ClassroomCardProps) {
   return (
     <Card className="flex flex-col">
       <CardHeader className="p-0">
         <div className="relative aspect-video">
           <Image
-            src={course.imageUrl}
-            alt={course.title}
+            src={classroom.imageUrl}
+            alt={classroom.title}
             fill
             className="object-cover rounded-t-lg"
-            data-ai-hint="course thumbnail"
+            data-ai-hint="classroom"
           />
         </div>
       </CardHeader>
       <CardContent className="p-4 flex-1 flex flex-col">
         <div className="flex justify-between items-center mb-2">
-          <Badge variant="secondary">{course.category}</Badge>
-          <p className="text-xs text-muted-foreground">{course.subject}</p>
+          <Badge variant="secondary">{classroom.subject}</Badge>
         </div>
-        <CardTitle className="text-lg font-semibold mb-2 line-clamp-2">{course.title}</CardTitle>
-        <p className="text-sm text-muted-foreground flex-1 line-clamp-3">{course.description}</p>
+        <CardTitle className="text-lg font-semibold mb-2 line-clamp-2">{classroom.title}</CardTitle>
+        <p className="text-sm text-muted-foreground flex-1 line-clamp-3">{classroom.description}</p>
       </CardContent>
       <CardFooter className="p-4 flex justify-between items-center">
-        <p className="text-xl font-bold text-primary">${course.price.toFixed(2)}</p>
-        <Button asChild>
-            <Link href={`/store/${course.id}`}>View Details</Link>
+        <Button asChild className="w-full">
+            <Link href={`/store/${classroom.id}`}>View Details</Link>
         </Button>
       </CardFooter>
     </Card>

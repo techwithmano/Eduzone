@@ -21,78 +21,73 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 
-const courseSchema = z.object({
+const classroomSchema = z.object({
   title: z.string().min(5, { message: "Title must be at least 5 characters." }),
-  description: z.string().min(20, { message: "Description must be at least 20 characters." }),
-  price: z.coerce.number().min(0, { message: "Price must be a positive number." }),
-  category: z.string({ required_error: "Please select a category."}).min(1, "Please select a category."),
+  description: z.string().min(10, { message: "Description must be at least 10 characters." }),
   subject: z.string({ required_error: "Please select a subject."}).min(1, "Please select a subject."),
 });
 
-const categories = ["Course", "Notes", "Mock Exam", "Worksheet"];
-const subjects = ["Math", "Programming", "History", "Science", "English"];
+const subjects = ["Math", "Programming", "History", "Science", "English", "Art", "Music"];
 
-export default function EditCoursePage() {
+export default function EditClassroomPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
-  const courseId = params.productId as string;
+  const classroomId = params.productId as string;
 
-  const form = useForm<z.infer<typeof courseSchema>>({
-    resolver: zodResolver(courseSchema),
+  const form = useForm<z.infer<typeof classroomSchema>>({
+    resolver: zodResolver(classroomSchema),
     defaultValues: {
       title: "",
       description: "",
-      price: 0,
-      category: undefined,
       subject: undefined,
     },
   });
   
   useEffect(() => {
-    if (!courseId) return;
+    if (!classroomId) return;
 
-    const fetchCourseData = async () => {
+    const fetchClassroomData = async () => {
       try {
-        const courseDocRef = doc(db, "products", courseId);
-        const courseDoc = await getDoc(courseDocRef);
+        const classroomDocRef = doc(db, "classrooms", classroomId);
+        const classroomDoc = await getDoc(classroomDocRef);
 
-        if (courseDoc.exists()) {
-          const courseData = courseDoc.data();
-          form.reset(courseData);
+        if (classroomDoc.exists()) {
+          const classroomData = classroomDoc.data();
+          form.reset(classroomData);
         } else {
-          toast({ variant: "destructive", title: "Course not found" });
+          toast({ variant: "destructive", title: "Classroom not found" });
           router.push("/dashboard/teacher");
         }
       } catch (error) {
-        console.error("Error fetching course data:", error);
-        toast({ variant: "destructive", title: "Failed to load course data" });
+        console.error("Error fetching classroom data:", error);
+        toast({ variant: "destructive", title: "Failed to load classroom data" });
       } finally {
         setLoading(false);
       }
     };
     
-    fetchCourseData();
-  }, [courseId, form, router, toast]);
+    fetchClassroomData();
+  }, [classroomId, form, router, toast]);
 
-  const onSubmit = async (values: z.infer<typeof courseSchema>) => {
+  const onSubmit = async (values: z.infer<typeof classroomSchema>) => {
     setSubmitting(true);
     try {
-        const courseDocRef = doc(db, "products", courseId);
-        await updateDoc(courseDocRef, values);
+        const classroomDocRef = doc(db, "classrooms", classroomId);
+        await updateDoc(classroomDocRef, values);
         toast({
-          title: "Course Updated!",
-          description: "Your course has been successfully updated.",
+          title: "Classroom Updated!",
+          description: "Your classroom has been successfully updated.",
         })
         router.push("/dashboard/teacher");
     } catch(error) {
-        console.error("Error updating course: ", error);
+        console.error("Error updating classroom: ", error);
         toast({
             variant: "destructive",
             title: "Uh oh! Something went wrong.",
-            description: "There was a problem updating your course. Please try again.",
+            description: "There was a problem updating your classroom. Please try again.",
         })
     } finally {
         setSubmitting(false);
@@ -118,17 +113,7 @@ export default function EditCoursePage() {
                         <Skeleton className="h-4 w-24" />
                         <Skeleton className="h-24 w-full" />
                     </div>
-                    <div className="grid grid-cols-2 gap-6">
-                       <div className="space-y-2">
-                            <Skeleton className="h-4 w-24" />
-                            <Skeleton className="h-10 w-full" />
-                        </div>
-                         <div className="space-y-2">
-                            <Skeleton className="h-4 w-24" />
-                            <Skeleton className="h-10 w-full" />
-                        </div>
-                    </div>
-                     <div className="space-y-2">
+                    <div className="space-y-2">
                         <Skeleton className="h-4 w-24" />
                         <Skeleton className="h-10 w-full" />
                     </div>
@@ -151,52 +136,27 @@ export default function EditCoursePage() {
             </Button>
             <Card>
                 <CardHeader>
-                    <CardTitle>Edit Course</CardTitle>
-                    <CardDescription>Update the details for your course or resource.</CardDescription>
+                    <CardTitle>Edit Classroom</CardTitle>
+                    <CardDescription>Update the details for your classroom.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                             <FormField control={form.control} name="title" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Course Title</FormLabel>
-                                    <FormControl><Input placeholder="e.g., Introduction to Algebra" {...field} /></FormControl>
+                                    <FormLabel>Classroom Title</FormLabel>
+                                    <FormControl><Input placeholder="e.g., Grade 10 Algebra" {...field} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )} />
 
                             <FormField control={form.control} name="description" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Course Description</FormLabel>
-                                    <FormControl><Textarea placeholder="Describe the course in detail..." className="min-h-[120px] resize-y" {...field} /></FormControl>
+                                    <FormLabel>Description</FormLabel>
+                                    <FormControl><Textarea placeholder="Describe the classroom in detail..." className="min-h-[120px] resize-y" {...field} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )} />
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FormField control={form.control} name="price" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Price ($)</FormLabel>
-                                        <FormControl><Input type="number" step="0.01" placeholder="e.g., 29.99" {...field} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )} />
-
-                                <FormField control={form.control} name="category" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Category</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {categories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )} />
-                            </div>
 
                             <FormField control={form.control} name="subject" render={({ field }) => (
                                 <FormItem>

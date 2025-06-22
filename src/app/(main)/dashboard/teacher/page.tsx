@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { collection, query, where, getDocs, orderBy, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
-import { type Course } from "@/components/product-card";
+import { type Classroom } from "@/components/product-card";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,17 +27,15 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 
-type TeacherCourse = Course & { creatorName?: string };
-
 export default function TeacherDashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [courses, setCourses] = useState<TeacherCourse[]>([]);
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   
   const [isAlertOpen, setIsAlertOpen] = useState(false);
-  const [courseToDelete, setCourseToDelete] = useState<TeacherCourse | null>(null);
+  const [classroomToDelete, setClassroomToDelete] = useState<Classroom | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -50,48 +48,48 @@ export default function TeacherDashboardPage() {
       return;
     }
 
-    const fetchCourses = async () => {
+    const fetchClassrooms = async () => {
       setLoading(true);
       try {
-        const q = query(collection(db, "products"), where("creatorId", "==", user.uid), orderBy("createdAt", "desc"));
+        const q = query(collection(db, "classrooms"), where("creatorId", "==", user.uid), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
-        const userCourses = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as TeacherCourse[];
-        setCourses(userCourses);
+        const userClassrooms = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Classroom[];
+        setClassrooms(userClassrooms);
       } catch (error) {
-        console.error("Error fetching user courses: ", error);
-        toast({ variant: "destructive", title: "Error fetching courses", description: "There was an issue retrieving your courses. Please try refreshing the page."})
+        console.error("Error fetching user classrooms: ", error);
+        toast({ variant: "destructive", title: "Error fetching classrooms", description: "There was an issue retrieving your classrooms. You may need to create a Firestore Index."})
       } finally {
         setLoading(false);
       }
     };
-    fetchCourses();
+    fetchClassrooms();
   }, [user, authLoading, router, toast]);
 
-  const handleDeleteClick = (course: TeacherCourse) => {
-    setCourseToDelete(course);
+  const handleDeleteClick = (classroom: Classroom) => {
+    setClassroomToDelete(classroom);
     setIsAlertOpen(true);
   };
   
   const handleDeleteConfirm = async () => {
-    if (!courseToDelete) return;
+    if (!classroomToDelete) return;
 
     try {
-        await deleteDoc(doc(db, "products", courseToDelete.id));
-        setCourses(courses.filter(p => p.id !== courseToDelete.id));
+        await deleteDoc(doc(db, "classrooms", classroomToDelete.id));
+        setClassrooms(classrooms.filter(p => p.id !== classroomToDelete.id));
         toast({
-            title: "Course Deleted",
-            description: `"${courseToDelete.title}" has been successfully deleted.`,
+            title: "Classroom Deleted",
+            description: `"${classroomToDelete.title}" has been successfully deleted.`,
         });
     } catch (error) {
-        console.error("Error deleting course: ", error);
+        console.error("Error deleting classroom: ", error);
         toast({
             variant: "destructive",
             title: "Deletion Failed",
-            description: "There was a problem deleting the course. Please try again.",
+            description: "There was a problem deleting the classroom. Please try again.",
         });
     } finally {
         setIsAlertOpen(false);
-        setCourseToDelete(null);
+        setClassroomToDelete(null);
     }
   };
 
@@ -115,11 +113,11 @@ export default function TeacherDashboardPage() {
           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
           <AlertDialogDescription>
             This action cannot be undone. This will permanently delete the
-            course "{courseToDelete?.title}".
+            classroom "{classroomToDelete?.title}" and all its contents.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={() => setCourseToDelete(null)}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel onClick={() => setClassroomToDelete(null)}>Cancel</AlertDialogCancel>
           <AlertDialogAction onClick={handleDeleteConfirm}>Delete</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -131,54 +129,52 @@ export default function TeacherDashboardPage() {
             <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl font-headline">
             Teacher Dashboard
             </h1>
-            <p className="text-muted-foreground">Manage your courses and educational content here.</p>
+            <p className="text-muted-foreground">Manage your classrooms here.</p>
         </div>
         <Button asChild>
           <Link href="/dashboard/teacher/create">
             <PlusCircle className="mr-2 h-4 w-4" />
-            Create New Course
+            Create New Classroom
           </Link>
         </Button>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Your Courses</CardTitle>
-          <CardDescription>A list of all the courses you have created.</CardDescription>
+          <CardTitle>Your Classrooms</CardTitle>
+          <CardDescription>A list of all the classrooms you have created.</CardDescription>
         </CardHeader>
         <CardContent>
-            {courses.length > 0 ? (
+            {classrooms.length > 0 ? (
              <div className="border rounded-md">
                 <Table>
                     <TableHeader>
                     <TableRow>
                         <TableHead>Title</TableHead>
-                        <TableHead className="hidden sm:table-cell">Category</TableHead>
-                        <TableHead className="text-right hidden md:table-cell">Price</TableHead>
+                        <TableHead className="hidden sm:table-cell">Subject</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
-                    {courses.map((course) => (
-                        <TableRow key={course.id}>
-                          <TableCell className="font-medium">{course.title}</TableCell>
-                          <TableCell className="hidden sm:table-cell"><Badge variant="secondary">{course.category}</Badge></TableCell>
-                          <TableCell className="text-right hidden md:table-cell">${course.price.toFixed(2)}</TableCell>
+                    {classrooms.map((classroom) => (
+                        <TableRow key={classroom.id}>
+                          <TableCell className="font-medium">{classroom.title}</TableCell>
+                          <TableCell className="hidden sm:table-cell"><Badge variant="secondary">{classroom.subject}</Badge></TableCell>
                           <TableCell className="text-right">
                               <Button variant="ghost" size="icon" asChild title="Manage Students">
-                                <Link href={`/dashboard/teacher/enrollments/${course.id}`}>
+                                <Link href={`/dashboard/teacher/enrollments/${classroom.id}`}>
                                     <Users className="h-4 w-4" />
                                     <span className="sr-only">Manage Students</span>
                                 </Link>
                               </Button>
-                              <Button variant="ghost" size="icon" asChild title="Edit Course">
-                                  <Link href={`/dashboard/teacher/edit/${course.id}`}>
+                              <Button variant="ghost" size="icon" asChild title="Edit Classroom">
+                                  <Link href={`/dashboard/teacher/edit/${classroom.id}`}>
                                       <Edit className="h-4 w-4" />
-                                      <span className="sr-only">Edit Course</span>
+                                      <span className="sr-only">Edit Classroom</span>
                                   </Link>
                               </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(course)} title="Delete Course">
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(classroom)} title="Delete Classroom">
                                   <Trash2 className="h-4 w-4" />
-                                  <span className="sr-only">Delete Course</span>
+                                  <span className="sr-only">Delete Classroom</span>
                               </Button>
                           </TableCell>
                         </TableRow>
@@ -188,8 +184,8 @@ export default function TeacherDashboardPage() {
              </div>
           ) : (
             <div className="text-center py-16">
-                <h3 className="text-lg font-semibold">No courses yet!</h3>
-                <p className="text-muted-foreground mt-2">Click the button above to create your first course.</p>
+                <h3 className="text-lg font-semibold">No classrooms yet!</h3>
+                <p className="text-muted-foreground mt-2">Click the button above to create your first classroom.</p>
             </div>
           )}
         </CardContent>

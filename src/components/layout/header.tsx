@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -19,7 +20,7 @@ export function Header() {
   const navItems = [
     { label: "Home", href: "/" },
     { label: "About", href: "/about" },
-    { label: "Store", href: "/store" },
+    { label: "Browse", href: "/store" },
     { label: "Contact", href: "/contact" },
   ];
   
@@ -45,7 +46,7 @@ export function Header() {
                 href={item.href}
                 className={cn(
                   "transition-colors hover:text-foreground/80",
-                  pathname === item.href ? "text-foreground" : "text-foreground/60"
+                  (pathname === item.href || (item.href === "/store" && pathname.startsWith("/store"))) ? "text-foreground" : "text-foreground/60"
                 )}
               >
                 {item.label}

@@ -7,67 +7,62 @@ import { db } from "@/lib/firebase/client";
 
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CourseCard, type Course } from "@/components/product-card";
+import { ClassroomCard, type Classroom } from "@/components/product-card";
 import { Search } from "lucide-react";
 import { CourseCardSkeleton } from "@/components/course-card-skeleton";
 
-const categories = ["All", "Course", "Notes", "Mock Exam", "Worksheet"];
-const subjects = ["All", "Math", "Programming", "History", "Science", "English"];
+const subjects = ["All", "Math", "Programming", "History", "Science", "English", "Art", "Music"];
 
 export default function StorePage() {
-  const [courses, setCourses] = useState<Course[]>([]);
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [category, setCategory] = useState("All");
   const [subject, setSubject] = useState("All");
 
   useEffect(() => {
-    const fetchCourses = async () => {
+    const fetchClassrooms = async () => {
       setLoading(true);
       try {
-        const coursesCollection = collection(db, "products");
-        const courseSnapshot = await getDocs(coursesCollection);
-        const courseList = courseSnapshot.docs.map(doc => {
+        const classroomsCollection = collection(db, "classrooms");
+        const classroomSnapshot = await getDocs(classroomsCollection);
+        const classroomList = classroomSnapshot.docs.map(doc => {
           const data = doc.data();
           return {
             id: doc.id,
             title: data.title,
             description: data.description,
-            price: data.price,
             imageUrl: data.imageUrl,
-            category: data.category,
             subject: data.subject,
           }
-        }) as Course[];
-        setCourses(courseList);
+        }) as Classroom[];
+        setClassrooms(classroomList);
       } catch (error) {
-        console.error("Error fetching courses: ", error);
+        console.error("Error fetching classrooms: ", error);
         // In a real app, you might want to show a toast notification here
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCourses();
+    fetchClassrooms();
   }, []);
 
-  const filteredCourses = useMemo(() => {
-    return courses.filter(course => {
-      const searchMatch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) || course.description.toLowerCase().includes(searchTerm.toLowerCase());
-      const categoryMatch = category === "All" || course.category === category;
-      const subjectMatch = subject === "All" || course.subject === subject;
-      return searchMatch && categoryMatch && subjectMatch;
+  const filteredClassrooms = useMemo(() => {
+    return classrooms.filter(classroom => {
+      const searchMatch = classroom.title.toLowerCase().includes(searchTerm.toLowerCase()) || classroom.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const subjectMatch = subject === "All" || classroom.subject === subject;
+      return searchMatch && subjectMatch;
     });
-  }, [courses, searchTerm, category, subject]);
+  }, [classrooms, searchTerm, subject]);
 
   return (
     <div className="bg-background text-foreground">
       <section className="w-full py-12 md:py-16 bg-secondary">
         <div className="container px-4 md:px-6">
           <div className="text-center space-y-3">
-            <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl font-headline">Course Marketplace</h1>
+            <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl font-headline">Browse Classrooms</h1>
             <p className="max-w-[700px] mx-auto text-muted-foreground md:text-xl">
-              Browse our curated collection of courses and educational resources.
+              Explore available classrooms and subjects.
             </p>
           </div>
         </div>
@@ -78,7 +73,7 @@ export default function StorePage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
-              placeholder="Search for courses, notes..."
+              placeholder="Search for classrooms..."
               className="pl-10"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -86,14 +81,6 @@ export default function StorePage() {
             />
           </div>
           <div className="flex gap-4">
-            <Select value={category} onValueChange={setCategory} disabled={loading}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-              </SelectContent>
-            </Select>
             <Select value={subject} onValueChange={setSubject} disabled={loading}>
               <SelectTrigger className="w-full md:w-[180px]">
                 <SelectValue placeholder="Subject" />
@@ -111,16 +98,16 @@ export default function StorePage() {
               <CourseCardSkeleton key={i} />
             ))}
            </div>
-        ) : filteredCourses.length > 0 ? (
+        ) : filteredClassrooms.length > 0 ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredCourses.map(course => (
-              <CourseCard key={course.id} course={course} />
+            {filteredClassrooms.map(classroom => (
+              <ClassroomCard key={classroom.id} classroom={classroom} />
             ))}
           </div>
         ) : (
           <div className="text-center py-16">
-            <h2 className="text-2xl font-semibold mb-2">No Courses Found</h2>
-            <p className="text-muted-foreground">Try adjusting your search or filters. You may also need to add courses to the database.</p>
+            <h2 className="text-2xl font-semibold mb-2">No Classrooms Found</h2>
+            <p className="text-muted-foreground">Try adjusting your search or filters. You may need to add classrooms to the database.</p>
           </div>
         )}
       </div>

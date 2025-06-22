@@ -21,40 +21,36 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
 
-const courseSchema = z.object({
+const classroomSchema = z.object({
   title: z.string().min(5, { message: "Title must be at least 5 characters." }),
-  description: z.string().min(20, { message: "Description must be at least 20 characters." }),
-  price: z.coerce.number().min(0, { message: "Price must be a positive number." }),
-  category: z.string({ required_error: "Please select a category."}).min(1, "Please select a category."),
+  description: z.string().min(10, { message: "Description must be at least 10 characters." }),
   subject: z.string({ required_error: "Please select a subject."}).min(1, "Please select a subject."),
 });
 
-const categories = ["Course", "Notes", "Mock Exam", "Worksheet"];
-const subjects = ["Math", "Programming", "History", "Science", "English"];
+const subjects = ["Math", "Programming", "History", "Science", "English", "Art", "Music"];
 
-export default function CreateCoursePage() {
+export default function CreateClassroomPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const form = useForm<z.infer<typeof courseSchema>>({
-    resolver: zodResolver(courseSchema),
+  const form = useForm<z.infer<typeof classroomSchema>>({
+    resolver: zodResolver(classroomSchema),
     defaultValues: {
       title: "",
       description: "",
-      price: 0,
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof courseSchema>) => {
+  const onSubmit = async (values: z.infer<typeof classroomSchema>) => {
     if (!user) {
-        toast({ variant: "destructive", title: "You must be logged in to create a course." });
+        toast({ variant: "destructive", title: "You must be logged in to create a classroom." });
         return;
     }
     setLoading(true);
     try {
-        await addDoc(collection(db, "products"), {
+        await addDoc(collection(db, "classrooms"), {
             ...values,
             imageUrl: `https://placehold.co/600x400.png`,
             creatorId: user.uid,
@@ -62,16 +58,16 @@ export default function CreateCoursePage() {
             createdAt: serverTimestamp(),
         });
         toast({
-          title: "Course Created!",
-          description: "Your new course has been added.",
+          title: "Classroom Created!",
+          description: "Your new classroom has been created.",
         })
         router.push("/dashboard/teacher");
     } catch(error) {
-        console.error("Error creating course: ", error);
+        console.error("Error creating classroom: ", error);
         toast({
             variant: "destructive",
             title: "Uh oh! Something went wrong.",
-            description: "There was a problem creating your course. Please try again.",
+            description: "There was a problem creating your classroom. Please try again.",
         })
     } finally {
         setLoading(false);
@@ -89,52 +85,27 @@ export default function CreateCoursePage() {
             </Button>
             <Card>
                 <CardHeader>
-                    <CardTitle>Create a New Course</CardTitle>
-                    <CardDescription>Fill out the form below to create a new course.</CardDescription>
+                    <CardTitle>Create a New Classroom</CardTitle>
+                    <CardDescription>Fill out the form below to set up your new classroom.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                             <FormField control={form.control} name="title" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Course Title</FormLabel>
-                                    <FormControl><Input placeholder="e.g., Introduction to Algebra" {...field} /></FormControl>
+                                    <FormLabel>Classroom Title</FormLabel>
+                                    <FormControl><Input placeholder="e.g., Grade 10 Algebra" {...field} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )} />
 
                             <FormField control={form.control} name="description" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Course Description</FormLabel>
-                                    <FormControl><Textarea placeholder="Describe the course in detail..." className="min-h-[120px] resize-y" {...field} /></FormControl>
+                                    <FormLabel>Description</FormLabel>
+                                    <FormControl><Textarea placeholder="e.g., A brief overview of the classroom..." className="min-h-[120px] resize-y" {...field} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )} />
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FormField control={form.control} name="price" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Price ($)</FormLabel>
-                                        <FormControl><Input type="number" step="0.01" placeholder="e.g., 29.99" {...field} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )} />
-
-                                <FormField control={form.control} name="category" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Category</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {categories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )} />
-                            </div>
 
                             <FormField control={form.control} name="subject" render={({ field }) => (
                                 <FormItem>
@@ -153,7 +124,7 @@ export default function CreateCoursePage() {
 
                             <Button type="submit" disabled={loading} className="w-full">
                                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Create Course
+                                Create Classroom
                             </Button>
                         </form>
                     </Form>

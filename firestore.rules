@@ -7,26 +7,16 @@ service cloud.firestore {
       allow create: if true;
     }
 
-    match /products/{productId} {
-      // Anyone can read products (courses)
+    match /classrooms/{classroomId} {
       allow read: if true;
-      // Only teachers can create, update, or delete them
-      allow create, update, delete: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
+      allow create, update, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
     }
     
     match /users/{userId} {
-      // A user can read their own document
       allow get: if request.auth.uid == userId;
-      
-      // A teacher can search for users or get a list of students in a course
-      allow list: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
-      
-      // A new user can create their own document
+      allow list: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
       allow create: if request.auth.uid == userId;
-
-      // A teacher can update a user's doc (e.g. to enroll them in a course)
-      // A user can also update their own document
-      allow update: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER' || request.auth.uid == userId;
+      allow update: if request.auth.uid == userId || (request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER');
     }
   }
 }

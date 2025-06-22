@@ -10,7 +10,7 @@ import { z } from "zod";
 import { collection, doc, getDoc, getDocs, query, where, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 
-import { type Course } from "@/components/product-card";
+import { type Classroom } from "@/components/product-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,9 +44,9 @@ export default function EnrollmentsPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
-  const courseId = params.courseId as string;
+  const classroomId = params.courseId as string;
 
-  const [course, setCourse] = useState<Course | null>(null);
+  const [classroom, setClassroom] = useState<Classroom | null>(null);
   const [enrolledStudents, setEnrolledStudents] = useState<EnrolledStudent[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -58,23 +58,23 @@ export default function EnrollmentsPage() {
   });
 
   useEffect(() => {
-    if (!courseId) return;
+    if (!classroomId) return;
 
     const fetchEnrollmentData = async () => {
       setLoading(true);
       try {
-        // Fetch course details
-        const courseDocRef = doc(db, "products", courseId);
-        const courseDoc = await getDoc(courseDocRef);
-        if (!courseDoc.exists()) {
-          toast({ variant: "destructive", title: "Course not found" });
+        // Fetch classroom details
+        const classroomDocRef = doc(db, "classrooms", classroomId);
+        const classroomDoc = await getDoc(classroomDocRef);
+        if (!classroomDoc.exists()) {
+          toast({ variant: "destructive", title: "Classroom not found" });
           router.push("/dashboard/teacher");
           return;
         }
-        setCourse({ id: courseDoc.id, ...courseDoc.data() } as Course);
+        setClassroom({ id: classroomDoc.id, ...classroomDoc.data() } as Classroom);
 
         // Fetch enrolled students using array-contains query
-        const studentsQuery = query(collection(db, "users"), where("enrolledCourseIds", "array-contains", courseId));
+        const studentsQuery = query(collection(db, "users"), where("enrolledCourseIds", "array-contains", classroomId));
         const studentsSnapshot = await getDocs(studentsQuery);
         const fetchedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as EnrolledStudent[];
         setEnrolledStudents(fetchedStudents);
@@ -88,12 +88,11 @@ export default function EnrollmentsPage() {
     };
 
     fetchEnrollmentData();
-  }, [courseId, router, toast]);
+  }, [classroomId, router, toast]);
 
   const handleAddStudent = async (values: z.infer<typeof addStudentSchema>) => {
     setSubmitting(true);
     try {
-      // 1. Find the user by email
       const usersQuery = query(collection(db, "users"), where("email", "==", values.email));
       const userSnapshot = await getDocs(usersQuery);
 
@@ -110,17 +109,15 @@ export default function EnrollmentsPage() {
         return;
       }
 
-      // 2. Check if already enrolled (client-side)
       const isEnrolled = enrolledStudents.some(s => s.id === studentDoc.id);
       if (isEnrolled) {
-        toast({ variant: "destructive", title: "Already Enrolled", description: "This student is already enrolled in this course." });
+        toast({ variant: "destructive", title: "Already Enrolled", description: "This student is already enrolled in this classroom." });
         return;
       }
 
-      // 3. Update user document with the new course ID
       const studentDocRef = doc(db, "users", studentDoc.id);
       await updateDoc(studentDocRef, {
-        enrolledCourseIds: arrayUnion(courseId)
+        enrolledCourseIds: arrayUnion(classroomId)
       });
       
       const newStudent: EnrolledStudent = {
@@ -131,7 +128,7 @@ export default function EnrollmentsPage() {
 
       setEnrolledStudents([...enrolledStudents, newStudent]);
       form.reset();
-      toast({ title: "Student Enrolled!", description: `${studentData.displayName} has been added to the course.`});
+      toast({ title: "Student Enrolled!", description: `${studentData.displayName} has been added to the classroom.`});
 
     } catch (error) {
       console.error("Error enrolling student:", error);
@@ -151,12 +148,12 @@ export default function EnrollmentsPage() {
     try {
         const studentDocRef = doc(db, "users", studentToRemove.id);
         await updateDoc(studentDocRef, {
-            enrolledCourseIds: arrayRemove(courseId)
+            enrolledCourseIds: arrayRemove(classroomId)
         });
         setEnrolledStudents(enrolledStudents.filter(s => s.id !== studentToRemove.id));
         toast({
             title: "Student Removed",
-            description: `"${studentToRemove.displayName}" has been removed from the course.`,
+            description: `"${studentToRemove.displayName}" has been removed from the classroom.`,
         });
     } catch (error) {
         console.error("Error removing student: ", error);
@@ -193,7 +190,7 @@ export default function EnrollmentsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove "{studentToRemove?.displayName}" from the course. They will lose access to all course materials. This action cannot be undone.
+              This will remove "{studentToRemove?.displayName}" from the classroom. They will lose access to all classroom materials. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -211,8 +208,8 @@ export default function EnrollmentsPage() {
           </Link>
         </Button>
         <div className="mb-6">
-            <h1 className="text-3xl font-bold tracking-tighter font-headline">Manage Enrollments</h1>
-            <p className="text-muted-foreground">Course: <span className="font-semibold text-foreground">{course?.title}</span></p>
+            <h1 className="text-3xl font-bold tracking-tighter font-headline">Manage Students</h1>
+            <p className="text-muted-foreground">Classroom: <span className="font-semibold text-foreground">{classroom?.title}</span></p>
         </div>
         
         <div className="grid lg:grid-cols-3 gap-8 items-start">
@@ -247,8 +244,8 @@ export default function EnrollmentsPage() {
                         <CardTitle>Enrolled Students</CardTitle>
                         <CardDescription>
                           {enrolledStudents.length > 0 
-                            ? `There are ${enrolledStudents.length} student(s) enrolled in this course.`
-                            : "No students are enrolled in this course yet."
+                            ? `There are ${enrolledStudents.length} student(s) enrolled in this classroom.`
+                            : "No students are enrolled in this classroom yet."
                           }
                         </CardDescription>
                     </CardHeader>
