@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/components/providers/auth-provider";
 
 const addStudentSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -39,6 +40,7 @@ type EnrolledStudent = Pick<UserProfile, 'uid' | 'displayName' | 'email'> & { id
 export default function EnrollmentsPage() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useAuth();
   const { toast } = useToast();
   const classroomId = params.classroomId as string;
 
@@ -54,15 +56,15 @@ export default function EnrollmentsPage() {
   });
 
   const fetchEnrollmentData = useCallback(async () => {
-    if (!classroomId) return;
+    if (!classroomId || !user) return;
     setLoading(true);
     try {
       // Fetch classroom details
       const classroomDocRef = doc(db, "classrooms", classroomId);
       const classroomDoc = await getDoc(classroomDocRef);
 
-      if (!classroomDoc.exists()) {
-        toast({ variant: "destructive", title: "Classroom not found" });
+      if (!classroomDoc.exists() || classroomDoc.data().creatorId !== user.uid) {
+        toast({ variant: "destructive", title: "Classroom not found or access denied." });
         router.push("/dashboard/teacher");
         return;
       }
@@ -85,7 +87,7 @@ export default function EnrollmentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [classroomId, router, toast]);
+  }, [classroomId, router, toast, user]);
 
   useEffect(() => {
     if (!classroomId) return;
@@ -119,7 +121,6 @@ export default function EnrollmentsPage() {
         return;
       }
 
-      // Use a batch write to update both the classroom and the user document atomically
       const batch = writeBatch(db);
 
       const classroomDocRef = doc(db, "classrooms", classroomId);
@@ -134,7 +135,7 @@ export default function EnrollmentsPage() {
       
       await batch.commit();
       
-      await fetchEnrollmentData(); // Refetch data to update the UI
+      await fetchEnrollmentData(); 
       form.reset();
       toast({ title: "Student Enrolled!", description: `${studentData.displayName} has been added to the classroom.`});
 
@@ -220,9 +221,9 @@ export default function EnrollmentsPage() {
 
       <div className="container py-8">
         <Button variant="ghost" asChild className="mb-4 -ml-4">
-          <Link href="/dashboard/teacher">
+          <Link href={`/dashboard/teacher/classroom/${classroomId}`}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Teacher Dashboard
+            Back to Classroom
           </Link>
         </Button>
         <div className="mb-6">
@@ -307,3 +308,4 @@ export default function EnrollmentsPage() {
     </>
   );
 }
+

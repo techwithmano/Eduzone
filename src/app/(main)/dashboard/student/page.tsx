@@ -4,7 +4,7 @@
 import { useAuth } from "@/components/providers/auth-provider";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { collection, query, where, getDocs, doc, getDoc, documentId } from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,31 +30,25 @@ export default function StudentDashboardPage() {
       return;
     }
 
-    const fetchEnrolledClassrooms = async () => {
-      if (!user?.enrolledClassroomIds || user.enrolledClassroomIds.length === 0) {
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      try {
-        const classroomsQuery = query(collection(db, "classrooms"), where(documentId(), "in", user.enrolledClassroomIds));
-        const classroomsSnapshot = await getDocs(classroomsQuery);
-        
+    setLoading(true);
+    // This query is more secure and efficient.
+    // It requires an index on the 'enrolledStudentIds' field.
+    const classroomsQuery = query(collection(db, "classrooms"), where("enrolledStudentIds", "array-contains", user.uid));
+    
+    const unsubscribe = onSnapshot(classroomsQuery, (classroomsSnapshot) => {
         const fetchedClassrooms = classroomsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classroom));
         setClassrooms(fetchedClassrooms);
-
-      } catch (error) {
-        console.error("Error fetching enrolled classrooms: ", error);
-      } finally {
         setLoading(false);
-      }
-    };
+    }, (error) => {
+        console.error("Error fetching enrolled classrooms: ", error);
+        setLoading(false);
+    });
 
-    fetchEnrolledClassrooms();
+    return () => unsubscribe();
 
   }, [user, authLoading, router]);
 
-  if (authLoading) {
+  if (authLoading || loading) {
      return (
       <div className="flex h-[calc(100vh-theme(spacing.14))] w-full items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -79,13 +73,7 @@ export default function StudentDashboardPage() {
       </div>
       
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {loading ? (
-          <>
-            <CourseCardSkeleton />
-            <CourseCardSkeleton />
-            <CourseCardSkeleton />
-          </>
-        ) : classrooms.length > 0 ? (
+        {classrooms.length > 0 ? (
           classrooms.map(classroom => (
             <ClassroomCard key={classroom.id} classroom={classroom} />
           ))
