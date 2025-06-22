@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { doc, getDoc, collection, query, orderBy, onSnapshot, Unsubscribe } from 'firebase/firestore';
+import { doc, getDoc, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
 import { format } from "date-fns";
@@ -13,9 +13,18 @@ import { type Assignment, type Submission } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Loader2, FileText, User, Calendar } from 'lucide-react';
+import { ArrowLeft, Loader2, User, Calendar } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function TeacherAssignmentPage() {
   const params = useParams();
@@ -44,7 +53,16 @@ export default function TeacherAssignmentPage() {
             const assignmentDocRef = doc(db, `classrooms/${classroomId}/assignments`, assignmentId);
             const assignmentDoc = await getDoc(assignmentDocRef);
             if (assignmentDoc.exists()) {
-                setAssignment({ id: assignmentDoc.id, ...assignmentDoc.data() } as Assignment);
+                const data = assignmentDoc.data();
+                 // Security check: only the teacher of the classroom can see this
+                const classroomDocRef = doc(db, 'classrooms', classroomId);
+                const classroomDoc = await getDoc(classroomDocRef);
+                if (classroomDoc.exists() && classroomDoc.data().creatorId === user.uid) {
+                    setAssignment({ id: assignmentDoc.id, ...data } as Assignment);
+                } else {
+                    toast({ variant: 'destructive', title: 'Error', description: 'You do not have permission to view this assignment.' });
+                    router.push(`/dashboard/teacher/classroom/${classroomId}`);
+                }
             } else {
                 toast({ variant: 'destructive', title: 'Error', description: 'Assignment not found.' });
                 router.push(`/dashboard/teacher/classroom/${classroomId}`);
@@ -76,15 +94,11 @@ export default function TeacherAssignmentPage() {
     return (
         <div className="container py-8">
             <Skeleton className="h-8 w-48 mb-6" />
-            <div className="grid md:grid-cols-3 gap-8">
-                <div className="md:col-span-2 space-y-4">
-                    <Skeleton className="h-10 w-3/4" />
-                    <Skeleton className="h-6 w-1/4" />
-                    <Skeleton className="h-24 w-full" />
-                </div>
-                <div className="md:col-span-1">
-                    <Skeleton className="h-64 w-full" />
-                </div>
+            <div className="space-y-4">
+                <Skeleton className="h-10 w-3/4" />
+                <Skeleton className="h-6 w-1/4" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-64 w-full" />
             </div>
         </div>
     );
@@ -112,7 +126,7 @@ export default function TeacherAssignmentPage() {
         
         {assignment.description && (
             <Card>
-                <CardHeader><CardTitle className="text-lg">Instructions</CardTitle></CardHeader>
+                <CardHeader><CardTitle>Instructions</CardTitle></CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground whitespace-pre-wrap">{assignment.description}</p>
                 </CardContent>
@@ -143,7 +157,23 @@ export default function TeacherAssignmentPage() {
                                         <TableCell className="font-medium">{submission.studentName}</TableCell>
                                         <TableCell>{format(submission.submittedAt.toDate(), 'PPP p')}</TableCell>
                                         <TableCell className="text-right">
-                                            <Button variant="outline" size="sm" disabled>View & Grade</Button>
+                                            <Dialog>
+                                                <DialogTrigger asChild>
+                                                    <Button variant="outline" size="sm">View & Grade</Button>
+                                                </DialogTrigger>
+                                                <DialogContent className="sm:max-w-xl">
+                                                    <DialogHeader>
+                                                        <DialogTitle>Submission from {submission.studentName}</DialogTitle>
+                                                        <DialogDescription>
+                                                            Submitted on {format(submission.submittedAt.toDate(), 'PPP p')}
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    <ScrollArea className="h-64 mt-4 p-4 border rounded-md">
+                                                       <p className="whitespace-pre-wrap text-sm">{submission.content}</p>
+                                                    </ScrollArea>
+                                                     {/* Grading form can be added here in the future */}
+                                                </DialogContent>
+                                            </Dialog>
                                         </TableCell>
                                     </TableRow>
                                 ))}

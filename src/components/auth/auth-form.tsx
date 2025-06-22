@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -25,6 +26,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
@@ -92,8 +94,10 @@ export function AuthForm() {
         uid: user.uid,
         displayName: values.name,
         email: values.email,
-        role: "STUDENT", // All sign-ups are students
+        role: "STUDENT", // All sign-ups are students by default
         createdAt: new Date(),
+        enrolledClassroomIds: [],
+        createdClassroomIds: [],
       });
 
       toast({ title: "Sign up successful!" });
@@ -113,7 +117,7 @@ export function AuthForm() {
     <Tabs defaultValue="login" className="w-full">
       <TabsList className="grid w-full grid-cols-2">
         <TabsTrigger value="login">Login</TabsTrigger>
-        <TabsTrigger value="signup">Student Sign Up</TabsTrigger>
+        <TabsTrigger value="signup">Sign Up</TabsTrigger>
       </TabsList>
       <TabsContent value="login">
         <Form {...loginForm}>
@@ -152,6 +156,11 @@ export function AuthForm() {
         </Form>
       </TabsContent>
       <TabsContent value="signup">
+        <div className="text-center pt-4">
+          <CardDescription>
+            All new accounts are created as Students. Teacher accounts must be created by an administrator.
+          </CardDescription>
+        </div>
         <Form {...signUpForm}>
           <form onSubmit={signUpForm.handleSubmit(handleSignUp)} className="space-y-6 pt-4">
             <FormField
@@ -159,7 +168,7 @@ export function AuthForm() {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Name</FormLabel>
+                  <FormLabel>Full Name</FormLabel>
                   <FormControl>
                     <Input placeholder="John Doe" {...field} />
                   </FormControl>
@@ -195,7 +204,7 @@ export function AuthForm() {
             />
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Sign Up
+              Sign Up as Student
             </Button>
           </form>
         </Form>

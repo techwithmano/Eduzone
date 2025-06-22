@@ -33,14 +33,16 @@ export function AssignmentCard({ assignment, classroomId, isTeacher = false, onD
   const cardContent = (
      <div className="flex justify-between items-center p-4">
         <div className="flex-1 space-y-1">
-            <CardTitle className="text-lg">{assignment.title}</CardTitle>
+            <CardTitle>{assignment.title}</CardTitle>
             <CardDescription>Due: {dueDate}</CardDescription>
         </div>
         {isTeacher ? (
              <div className="flex items-center">
-                <Button variant="secondary" size="sm">
-                  View Submissions
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                <Button variant="secondary" size="sm" asChild>
+                   <Link href={`/dashboard/teacher/classroom/${classroomId}/assignment/${assignment.id}`}>
+                      View Submissions
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                   </Link>
                 </Button>
                 <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -77,9 +79,8 @@ export function AssignmentCard({ assignment, classroomId, isTeacher = false, onD
   return (
     <Card className="hover:shadow-md transition-shadow">
       {isTeacher ? (
-        <Link href={`/dashboard/teacher/classroom/${classroomId}/assignment/${assignment.id}`} className="block">
-          {cardContent}
-        </Link>
+        // The link is now on the button, not the whole card, to prevent nesting issues.
+        cardContent
       ) : (
         cardContent
       )}

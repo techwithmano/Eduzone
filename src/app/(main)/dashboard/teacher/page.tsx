@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
-import { collection, query, where, onSnapshot, orderBy, doc, deleteDoc, writeBatch, arrayRemove } from "firebase/firestore";
+import { collection, query, where, onSnapshot, orderBy, writeBatch, arrayRemove, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { type Classroom } from "@/lib/types";
 
@@ -79,17 +79,22 @@ export default function TeacherDashboardPage() {
     try {
         const batch = writeBatch(db);
 
+        // Delete the classroom document itself
         const classroomDocRef = doc(db, "classrooms", classroomToDelete.id);
         batch.delete(classroomDocRef);
 
+        // Remove the classroom ID from the teacher's user document
         const userDocRef = doc(db, "users", user.uid);
         batch.update(userDocRef, {
             createdClassroomIds: arrayRemove(classroomToDelete.id)
         });
+        
+        // Note: In a real-world scenario, you would also need to handle:
+        // 1. Removing the classroom from all enrolled students' `enrolledClassroomIds` array.
+        // 2. Deleting all subcollections (announcements, assignments, etc.) within the classroom, which requires a Cloud Function.
 
         await batch.commit();
 
-        // The onSnapshot listener will automatically update the UI
         toast({
             title: "Classroom Deleted",
             description: `"${classroomToDelete.title}" has been successfully deleted.`,
@@ -127,7 +132,7 @@ export default function TeacherDashboardPage() {
           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
           <AlertDialogDescription>
             This action cannot be undone. This will permanently delete the
-            classroom "{classroomToDelete?.title}" and all its contents.
+            classroom "{classroomToDelete?.title}" and remove it from your dashboard.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
