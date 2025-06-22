@@ -33,23 +33,13 @@ export default function StudentDashboardPage() {
       if (!user) return;
       setLoading(true);
       try {
-        const userDocRef = doc(db, "users", user.uid);
-        const userDoc = await getDoc(userDocRef);
+        // Query classrooms where the user's ID is in the enrolledStudentIds array
+        const classroomsQuery = query(collection(db, "classrooms"), where("enrolledStudentIds", "array-contains", user.uid));
+        const classroomsSnapshot = await getDocs(classroomsQuery);
+        
+        const fetchedClassrooms = classroomsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classroom));
+        setClassrooms(fetchedClassrooms);
 
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          const classroomIds = userData.enrolledCourseIds || [];
-          
-          if (classroomIds.length > 0) {
-            const classroomsQuery = query(collection(db, "classrooms"), where(documentId(), "in", classroomIds));
-            const classroomsSnapshot = await getDocs(classroomsQuery);
-            
-            const fetchedClassrooms = classroomsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classroom));
-            setClassrooms(fetchedClassrooms);
-          } else {
-            setClassrooms([]);
-          }
-        }
       } catch (error) {
         console.error("Error fetching enrolled classrooms: ", error);
       } finally {

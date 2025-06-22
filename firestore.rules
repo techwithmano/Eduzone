@@ -2,35 +2,54 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if a user is a teacher
-    function isTeacher(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data.role == 'TEACHER';
-    }
-
-    // Rules for user profiles
-    match /users/{userId} {
-      allow read: if request.auth.uid == userId || isTeacher(request.auth.uid);
-      allow create: if request.auth.uid == userId;
-      allow update: if request.auth.uid == userId;
-      allow list: if isTeacher(request.auth.uid);
-    }
-
-    // Rules for products sold in the store
-    match /products/{productId} {
-      allow read: if true;
-      allow create, update, delete: if isTeacher(request.auth.uid);
-    }
     
-    // Rules for classrooms in the LMS
-    match /classrooms/{classroomId} {
-      allow read: if true; // Or more specific rules later
-      allow create, update, delete: if isTeacher(request.auth.uid);
+    // PUBLIC COLLECTIONS
+    // ===================================
+    match /contacts/{documentId} {
+      // Anyone can send a message through the contact form
+      allow create: if true;
+      allow read, update, delete: if false; // Only backend processes should manage this
     }
 
-    // Rules for contact form submissions
-    match /contacts/{documentId} {
-      allow create: if true;
+    match /products/{productId} {
+      // Anyone can view products in the store
+      allow get, list: if true;
+      // Only teachers can create, update, or delete products
+      allow create, update, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
+    }
+
+    // USER-SPECIFIC COLLECTIONS
+    // ===================================
+    match /users/{userId} {
+      // A user can get their own document
+      allow get: if request.auth.uid == userId;
+      // A user can create their own document upon signup
+      allow create: if request.auth.uid == userId;
+      // A teacher can search the list of users (e.g., to find a student by email)
+      allow list: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
+      // No one can update or delete another user's document through the client
+      allow update, delete: if false;
+    }
+
+    // LMS-SPECIFIC COLLECTIONS
+    // ===================================
+    match /classrooms/{classroomId} {
+        // Allow read if you are the creator OR you are an enrolled student
+        allow get, list: if request.auth != null && (
+                         request.auth.uid == resource.data.creatorId || 
+                         request.auth.uid in resource.data.enrolledStudentIds
+                       );
+        
+        // Only a teacher can create a classroom, and they must set themselves as the creator
+        allow create: if request.auth != null &&
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER' &&
+                      request.resource.data.creatorId == request.auth.uid;
+                      
+        // Only the creator can update the classroom (e.g., to change details or enroll students)
+        allow update: if request.auth != null && request.auth.uid == resource.data.creatorId;
+
+        // Only the creator can delete the classroom
+        allow delete: if request.auth != null && request.auth.uid == resource.data.creatorId;
     }
   }
 }

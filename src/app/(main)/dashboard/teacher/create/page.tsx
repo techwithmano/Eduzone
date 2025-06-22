@@ -55,6 +55,7 @@ export default function CreateClassroomPage() {
             imageUrl: `https://placehold.co/600x400.png`,
             creatorId: user.uid,
             creatorName: user.displayName || "Anonymous",
+            enrolledStudentIds: [],
             createdAt: serverTimestamp(),
         });
         toast({

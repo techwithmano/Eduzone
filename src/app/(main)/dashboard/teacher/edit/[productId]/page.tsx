@@ -35,7 +35,7 @@ export default function EditClassroomPage() {
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
-  // The slug is still called `productId` from the folder name, but it's a classroom ID.
+  // Note: The folder is named `[productId]` but we are treating it as a classroom ID for our LMS.
   const classroomId = params.productId as string;
 
   const form = useForm<z.infer<typeof classroomSchema>>({

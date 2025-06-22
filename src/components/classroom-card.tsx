@@ -11,6 +11,9 @@ export type Classroom = {
   description: string;
   imageUrl: string;
   subject: string;
+  creatorId: string;
+  creatorName: string;
+  enrolledStudentIds?: string[];
 };
 
 interface ClassroomCardProps {
@@ -39,7 +42,6 @@ export function ClassroomCard({ classroom }: ClassroomCardProps) {
         <p className="text-sm text-muted-foreground flex-1 line-clamp-3">{classroom.description}</p>
       </CardContent>
       <CardFooter className="p-4 flex justify-between items-center">
-        {/* This can be changed later to "View Classroom" and go to a classroom detail page */}
         <Button asChild className="w-full">
             <Link href={`/dashboard/student/classroom/${classroom.id}`}>View Classroom</Link>
         </Button>

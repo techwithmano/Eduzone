@@ -1,13 +1,13 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { collection, doc, getDoc, getDocs, query, where, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where, updateDoc, arrayUnion, arrayRemove, documentId } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 
 import { type Classroom } from "@/components/classroom-card";
@@ -44,7 +44,6 @@ export default function EnrollmentsPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
-  // The slug is still called `courseId` from the folder name, but it's a classroom ID.
   const classroomId = params.courseId as string;
 
   const [classroom, setClassroom] = useState<Classroom | null>(null);
@@ -58,38 +57,42 @@ export default function EnrollmentsPage() {
     defaultValues: { email: "" },
   });
 
-  useEffect(() => {
-    if (!classroomId) return;
+  const fetchEnrollmentData = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Fetch classroom details
+      const classroomDocRef = doc(db, "classrooms", classroomId);
+      const classroomDoc = await getDoc(classroomDocRef);
+      if (!classroomDoc.exists()) {
+        toast({ variant: "destructive", title: "Classroom not found" });
+        router.push("/dashboard/teacher");
+        return;
+      }
+      const classroomData = { id: classroomDoc.id, ...classroomDoc.data() } as Classroom;
+      setClassroom(classroomData);
 
-    const fetchEnrollmentData = async () => {
-      setLoading(true);
-      try {
-        // Fetch classroom details
-        const classroomDocRef = doc(db, "classrooms", classroomId);
-        const classroomDoc = await getDoc(classroomDocRef);
-        if (!classroomDoc.exists()) {
-          toast({ variant: "destructive", title: "Classroom not found" });
-          router.push("/dashboard/teacher");
-          return;
-        }
-        setClassroom({ id: classroomDoc.id, ...classroomDoc.data() } as Classroom);
-
-        // Fetch enrolled students by querying the users collection
-        const studentsQuery = query(collection(db, "users"), where("enrolledCourseIds", "array-contains", classroomId));
+      // Fetch enrolled students by their IDs stored in the classroom document
+      const studentIds = classroomData.enrolledStudentIds || [];
+      if (studentIds.length > 0) {
+        const studentsQuery = query(collection(db, "users"), where(documentId(), "in", studentIds));
         const studentsSnapshot = await getDocs(studentsQuery);
         const fetchedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as EnrolledStudent[];
         setEnrolledStudents(fetchedStudents);
-
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        toast({ variant: "destructive", title: "Failed to load data", description: "You may need to create a Firestore index. Check the browser console for a link." });
-      } finally {
-        setLoading(false);
+      } else {
+        setEnrolledStudents([]);
       }
-    };
-
-    fetchEnrollmentData();
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      toast({ variant: "destructive", title: "Failed to load data", description: "An unexpected error occurred." });
+    } finally {
+      setLoading(false);
+    }
   }, [classroomId, router, toast]);
+
+  useEffect(() => {
+    if (!classroomId) return;
+    fetchEnrollmentData();
+  }, [classroomId, fetchEnrollmentData]);
 
   const handleAddStudent = async (values: z.infer<typeof addStudentSchema>) => {
     setSubmitting(true);
@@ -99,6 +102,7 @@ export default function EnrollmentsPage() {
 
       if (userSnapshot.empty) {
         toast({ variant: "destructive", title: "Student not found", description: "No user exists with this email address." });
+        setSubmitting(false);
         return;
       }
       
@@ -107,28 +111,23 @@ export default function EnrollmentsPage() {
       
       if (studentData.role !== 'STUDENT') {
         toast({ variant: "destructive", title: "Not a Student", description: "This user is not registered as a student." });
+        setSubmitting(false);
         return;
       }
 
-      const isEnrolled = enrolledStudents.some(s => s.id === studentDoc.id);
-      if (isEnrolled) {
+      if (classroom?.enrolledStudentIds?.includes(studentDoc.id)) {
         toast({ variant: "destructive", title: "Already Enrolled", description: "This student is already enrolled in this classroom." });
+        setSubmitting(false);
         return;
       }
 
-      // Add the classroomId to the student's `enrolledCourseIds` array
-      const studentDocRef = doc(db, "users", studentDoc.id);
-      await updateDoc(studentDocRef, {
-        enrolledCourseIds: arrayUnion(classroomId)
+      // Add the student's ID to the classroom's `enrolledStudentIds` array
+      const classroomDocRef = doc(db, "classrooms", classroomId);
+      await updateDoc(classroomDocRef, {
+        enrolledStudentIds: arrayUnion(studentDoc.id)
       });
       
-      const newStudent: EnrolledStudent = {
-        id: studentDoc.id,
-        displayName: studentData.displayName,
-        email: studentData.email
-      };
-
-      setEnrolledStudents([...enrolledStudents, newStudent]);
+      await fetchEnrollmentData(); // Refetch data to update the UI
       form.reset();
       toast({ title: "Student Enrolled!", description: `${studentData.displayName} has been added to the classroom.`});
 
@@ -148,11 +147,12 @@ export default function EnrollmentsPage() {
     if (!studentToRemove) return;
 
     try {
-        // Remove the classroomId from the student's `enrolledCourseIds` array
-        const studentDocRef = doc(db, "users", studentToRemove.id);
-        await updateDoc(studentDocRef, {
-            enrolledCourseIds: arrayRemove(classroomId)
+        // Remove the student's ID from the classroom's `enrolledStudentIds` array
+        const classroomDocRef = doc(db, "classrooms", classroomId);
+        await updateDoc(classroomDocRef, {
+            enrolledStudentIds: arrayRemove(studentToRemove.id)
         });
+
         setEnrolledStudents(enrolledStudents.filter(s => s.id !== studentToRemove.id));
         toast({
             title: "Student Removed",
