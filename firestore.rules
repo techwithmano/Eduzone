@@ -1,54 +1,71 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    function isTeacher() {
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
+    }
 
+    // Users can only read their own profile. Sign up is open to create a user doc.
     match /users/{userId} {
-      // Users can read/write their own document
       allow read, update: if request.auth.uid == userId;
-      // Teachers can list users to find them for enrollment
-      allow list: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
-      // New users can create their own document
-      allow create: if request.auth.uid == userId;
-    }
-
-    match /classrooms/{classroomId} {
-      // Only the teacher who created the classroom can read or write to it
-      allow read, write: if request.auth != null && request.resource.data.creatorId == request.auth.uid;
-      // Enrolled students can read the classroom details
-      allow get: if request.auth != null && request.auth.uid in resource.data.enrolledStudentIds;
-      // Enrolled students can list the classrooms they are a part of (for their dashboard)
-      allow list: if request.auth != null && request.resource.data.enrolledStudentIds.hasAny([request.auth.uid]);
+      allow create: if true; 
+      allow list: if isTeacher(); // Teachers can list users to find emails for enrollment
     }
     
-    match /classrooms/{classroomId}/announcements/{announcementId} {
-      // Teacher (owner) can do anything
-      allow write: if request.auth != null && get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId == request.auth.uid;
-      // Enrolled students and the teacher can read
-      allow read: if request.auth != null && (get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId == request.auth.uid || request.auth.uid in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.enrolledStudentIds);
-    }
-    
-    match /classrooms/{classroomId}/assignments/{assignmentId} {
-      // Teacher (owner) can do anything
-      allow write: if request.auth != null && get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId == request.auth.uid;
-      // Enrolled students and the teacher can read
-      allow read: if request.auth != null && (get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId == request.auth.uid || request.auth.uid in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.enrolledStudentIds);
-    }
-
-    match /classrooms/{classroomId}/assignments/{assignmentId}/submissions/{studentId} {
-      // The teacher who owns the classroom can read any submission.
-      allow get, list: if request.auth != null && get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId == request.auth.uid;
-
-      // A student can read and write their own submission, but only if they are enrolled in the class.
-      allow get, write: if request.auth.uid == studentId && request.auth.uid in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.enrolledStudentIds;
-    }
-
     match /contacts/{documentId} {
       allow create: if true;
     }
 
     match /products/{productId} {
       allow read: if true;
-      allow create, update, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
+      allow create, update, delete: if isTeacher();
+    }
+    
+    match /classrooms/{classroomId} {
+      // A user can get a classroom if they are the creator OR if they are an enrolled student.
+      // This is used by students to fetch details for their enrolled classes.
+      allow get: if request.auth != null && (
+        resource.data.creatorId == request.auth.uid || 
+        (
+          'enrolledStudentIds' in resource.data &&
+          request.auth.uid in resource.data.enrolledStudentIds
+        )
+      );
+
+      // Teachers can list the classrooms they created.
+      allow list: if isTeacher() && request.query.where.creatorId == request.auth.uid;
+      
+      allow create: if isTeacher();
+      allow update, delete: if request.auth != null && resource.data.creatorId == request.auth.uid;
+
+      // Rules for subcollections (Announcements, Assignments)
+      match /{subcollection}/{docId} {
+        // Allow read (get and list) if the user is the classroom creator OR is an enrolled student.
+        // This rule is more robust and checks for the existence of the 'enrolledStudentIds' field.
+        allow read: if request.auth != null && (
+          get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId == request.auth.uid ||
+          (
+            'enrolledStudentIds' in get(/databases/$(database)/documents/classrooms/$(classroomId)).data &&
+            request.auth.uid in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.enrolledStudentIds
+          )
+        );
+
+        // Only the classroom creator can create, update, or delete assignments and announcements.
+        allow write: if request.auth != null && get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId == request.auth.uid;
+      }
+
+      // Nested rule for submissions within an assignment
+      match /assignments/{assignmentId}/submissions/{studentId} {
+        // Allow read if the user is the owner of the submission OR is the classroom creator.
+        allow read: if request.auth != null && (
+          request.auth.uid == studentId ||
+          get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId == request.auth.uid
+        );
+        // Allow a student to create or update their own submission.
+        allow write: if request.auth != null && request.auth.uid == studentId;
+      }
     }
   }
 }
