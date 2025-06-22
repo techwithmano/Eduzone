@@ -4,7 +4,7 @@ import { Icons } from "@/components/icons";
 
 export function Footer() {
   return (
-    <footer className="border-t">
+    <footer className="border-t bg-secondary/50">
       <div className="container py-8">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           <div>

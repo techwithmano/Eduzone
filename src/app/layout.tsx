@@ -16,7 +16,7 @@ const fontSourceCodePro = Source_Code_Pro({
 });
 
 export const metadata: Metadata = {
-  title: 'EduCentral - The Future of Learning',
+  title: 'EduZone - The Future of Learning',
   description: 'An integrated platform for students and teachers to create, learn, and grow together.',
 };
 

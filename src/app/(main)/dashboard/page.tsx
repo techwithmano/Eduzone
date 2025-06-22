@@ -3,7 +3,6 @@
 import { useAuth } from "@/components/providers/auth-provider";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2 } from "lucide-react";
 
 export default function DashboardRedirectPage() {

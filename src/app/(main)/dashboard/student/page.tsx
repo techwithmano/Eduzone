@@ -6,9 +6,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react";
 import { ClassroomCard } from "@/components/classroom-card";
 import { CourseCardSkeleton } from "@/components/course-card-skeleton";
 import { type Classroom } from "@/lib/types";
@@ -31,6 +30,7 @@ export default function StudentDashboardPage() {
     }
 
     setLoading(true);
+    // Use the enrolledClassroomIds from the user profile to query
     const classroomsQuery = query(collection(db, "classrooms"), where("enrolledStudentIds", "array-contains", user.uid));
     
     const unsubscribe = onSnapshot(classroomsQuery, (classroomsSnapshot) => {

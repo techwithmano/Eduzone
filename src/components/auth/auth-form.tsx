@@ -66,7 +66,7 @@ export function AuthForm() {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       toast({ title: "Login successful!" });
       router.push("/dashboard");
-      router.refresh(); // Force a refresh to ensure all data is loaded
+      router.refresh(); 
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -100,7 +100,7 @@ export function AuthForm() {
         createdClassroomIds: [],
       });
 
-      toast({ title: "Sign up successful!", description: "Welcome to EduCentral!" });
+      toast({ title: "Sign up successful!", description: "Welcome to EduZone!" });
       router.push("/dashboard");
       router.refresh();
     } catch (error: any) {
@@ -166,7 +166,7 @@ export function AuthForm() {
         <CardHeader>
             <CardTitle>Create an Account</CardTitle>
             <CardDescription>
-                All new accounts are created as Students. Teacher accounts must be enabled by an administrator.
+                All new accounts are created as Students. Teacher accounts must be enabled separately by an administrator.
             </CardDescription>
         </CardHeader>
         <Form {...signUpForm}>

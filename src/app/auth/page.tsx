@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Icons } from "@/components/icons";
 import { AuthForm } from "@/components/auth/auth-form";
 
@@ -9,7 +9,7 @@ export default function AuthPage() {
              <div className="absolute top-4 left-4">
                 <Link href="/" className="flex items-center space-x-2 text-foreground/80 hover:text-foreground">
                     <Icons.logo className="h-6 w-6 text-primary" />
-                    <span className="font-bold">EduCentral</span>
+                    <span className="font-bold">EduZone</span>
                 </Link>
              </div>
              <Card className="w-full max-w-md shadow-2xl">

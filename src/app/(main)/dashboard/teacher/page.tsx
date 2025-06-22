@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
-import { collection, query, where, onSnapshot, orderBy, writeBatch, arrayRemove, doc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, orderBy, writeBatch, arrayRemove, doc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { type Classroom } from "@/lib/types";
 
@@ -79,13 +79,27 @@ export default function TeacherDashboardPage() {
     try {
         const batch = writeBatch(db);
 
+        // Delete the classroom document itself
         const classroomDocRef = doc(db, "classrooms", classroomToDelete.id);
         batch.delete(classroomDocRef);
 
+        // Remove the classroom ID from the teacher's profile
         const userDocRef = doc(db, "users", user.uid);
         batch.update(userDocRef, {
             createdClassroomIds: arrayRemove(classroomToDelete.id)
         });
+
+        // Remove the classroom from all enrolled students
+        const enrolledIds = classroomToDelete.enrolledStudentIds;
+        if(enrolledIds && enrolledIds.length > 0) {
+           const studentsQuery = query(collection(db, "users"), where('__name__', 'in', enrolledIds));
+           const studentDocs = await getDocs(studentsQuery);
+           studentDocs.forEach(studentDoc => {
+               batch.update(studentDoc.ref, {
+                   enrolledClassroomIds: arrayRemove(classroomToDelete.id)
+               });
+           });
+        }
         
         await batch.commit();
 
@@ -126,8 +140,7 @@ export default function TeacherDashboardPage() {
           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
           <AlertDialogDescription>
             This action cannot be undone. This will permanently delete the
-            classroom "{classroomToDelete?.title}" and remove it from your dashboard.
-            Enrolled students will lose access.
+            classroom "{classroomToDelete?.title}" and remove it from all enrolled students.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -205,7 +218,7 @@ export default function TeacherDashboardPage() {
                 </Table>
              </div>
           ) : (
-            <div className="text-center py-16">
+            <div className="text-center py-16 border-2 border-dashed rounded-lg">
                 <h3 className="text-lg font-semibold">No classrooms yet!</h3>
                 <p className="text-muted-foreground mt-2">Click the button above to create your first classroom.</p>
             </div>

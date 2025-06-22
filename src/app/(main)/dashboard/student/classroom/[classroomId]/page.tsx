@@ -12,7 +12,7 @@ import { type Classroom, type Announcement, type Assignment } from '@/lib/types'
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Loader2, Megaphone, FileText } from 'lucide-react';
+import { ArrowLeft, Megaphone, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AnnouncementCard } from '@/components/announcement-card';
@@ -53,10 +53,12 @@ export default function StudentClassroomPage() {
             setClassroom({ id: classroomDoc.id, ...classroomData });
           } else {
             console.error("Access denied: student not enrolled in this classroom.");
+            toast({ variant: 'destructive', title: 'Access Denied', description: 'You are not enrolled in this classroom.' });
             router.push('/dashboard/student');
           }
         } else {
           console.error("Classroom not found.");
+          toast({ variant: 'destructive', title: 'Error', description: 'Classroom not found.' });
           router.push('/dashboard/student');
         }
       } catch (error) {
@@ -79,6 +81,8 @@ export default function StudentClassroomPage() {
     const announcementsUnsub = onSnapshot(announcementsQuery, (snapshot) => {
       const fetchedAnnouncements = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement));
       setAnnouncements(fetchedAnnouncements);
+    }, (err) => {
+        console.error("Error fetching announcements:", err);
     });
     unsubscribers.push(announcementsUnsub);
 
@@ -87,6 +91,8 @@ export default function StudentClassroomPage() {
     const assignmentsUnsub = onSnapshot(assignmentsQuery, (snapshot) => {
       const fetchedAssignments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Assignment));
       setAssignments(fetchedAssignments);
+    }, (err) => {
+        console.error("Error fetching assignments:", err);
     });
     unsubscribers.push(assignmentsUnsub);
 
@@ -113,7 +119,7 @@ export default function StudentClassroomPage() {
   if (!classroom) {
     return (
         <div className="container text-center py-20">
-            <h1 className="text-2xl font-bold">Classroom not found or not enrolled.</h1>
+            <h1 className="text-2xl font-bold">Classroom not found or access denied.</h1>
             <Button asChild className="mt-4">
                 <Link href="/dashboard/student">
                     <ArrowLeft className="mr-2 h-4 w-4" />
@@ -156,7 +162,7 @@ export default function StudentClassroomPage() {
                     <AnnouncementCard key={announcement.id} announcement={announcement} />
                 ))
               ) : (
-                <p className="text-muted-foreground">No announcements yet.</p>
+                <p className="text-muted-foreground text-center py-4">No announcements yet.</p>
               )}
             </CardContent>
           </Card>
@@ -172,7 +178,7 @@ export default function StudentClassroomPage() {
                     <AssignmentCard key={assignment.id} classroomId={classroomId} assignment={assignment} />
                  ))
                ) : (
-                <p className="text-muted-foreground">No assignments have been posted yet.</p>
+                <p className="text-muted-foreground text-center py-4">No assignments have been posted yet.</p>
                )}
             </CardContent>
           </Card>

@@ -20,13 +20,14 @@ export function Header() {
   const navItems = [
     { label: "Home", href: "/" },
     { label: "About", href: "/about" },
-    { label: "Browse", href: "/store" },
+    { label: "Store", href: "/store" },
     { label: "Contact", href: "/contact" },
   ];
   
   const loggedInNavItems = [
-    ...navItems,
     { label: "Dashboard", href: "/dashboard" },
+    { label: "Store", href: "/store" },
+    { label: "About", href: "/about" },
   ];
 
   const currentNavItems = user ? loggedInNavItems : navItems;
@@ -46,7 +47,7 @@ export function Header() {
                 href={item.href}
                 className={cn(
                   "transition-colors hover:text-foreground/80",
-                  (pathname === item.href || (item.href === "/store" && pathname.startsWith("/store"))) ? "text-foreground" : "text-foreground/60"
+                  (pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))) ? "text-foreground" : "text-foreground/60"
                 )}
               >
                 {item.label}
@@ -92,7 +93,7 @@ export function Header() {
         </Sheet>
         <div className="flex flex-1 items-center justify-end space-x-2">
           {loading ? (
-            <Skeleton className="h-8 w-20" />
+            <Skeleton className="h-8 w-8 rounded-full" />
           ) : user ? (
             <UserNav />
           ) : (

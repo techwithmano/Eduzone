@@ -2,16 +2,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
-export type Product = {
-  id: string;
-  title: string;
-  description: string;
-  imageUrl: string;
-  subject: string;
-};
+import { type Product } from "@/lib/types";
 
 interface ProductCardProps {
   product: Product;
@@ -19,7 +12,7 @@ interface ProductCardProps {
 
 export function ProductCard({ product }: ProductCardProps) {
   return (
-    <Card className="flex flex-col">
+    <Card className="flex flex-col hover:shadow-lg transition-shadow duration-300">
       <CardHeader className="p-0">
         <div className="relative aspect-video">
           <Image
@@ -36,9 +29,9 @@ export function ProductCard({ product }: ProductCardProps) {
           <Badge variant="secondary">{product.subject}</Badge>
         </div>
         <CardTitle className="text-lg font-semibold mb-2 line-clamp-2">{product.title}</CardTitle>
-        <p className="text-sm text-muted-foreground flex-1 line-clamp-3">{product.description}</p>
+        <CardDescription className="flex-1 line-clamp-3">{product.description}</CardDescription>
       </CardContent>
-      <CardFooter className="p-4 flex justify-between items-center">
+      <CardFooter className="p-4">
         <Button asChild className="w-full">
             <Link href={`/store/${product.id}`}>View Details</Link>
         </Button>

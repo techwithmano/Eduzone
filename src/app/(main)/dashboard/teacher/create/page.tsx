@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -57,7 +57,7 @@ export default function CreateClassroomPage() {
         batch.set(newClassroomRef, {
             ...values,
             id: newClassroomRef.id,
-            imageUrl: `https://placehold.co/600x400.png`,
+            imageUrl: `https://placehold.co/600x400.png?text=${values.subject.replace(' ', '+')}`,
             creatorId: user.uid,
             creatorName: user.displayName || "Anonymous",
             enrolledStudentIds: [],

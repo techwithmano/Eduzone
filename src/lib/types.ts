@@ -1,12 +1,13 @@
 
-import type { Timestamp } from "firebase/firestore";
+import type { Timestamp, FieldValue } from "firebase/firestore";
 
 export type UserProfile = {
   uid: string;
-  displayName: string;
+  displayName: string | null;
   email: string;
+  photoURL?: string | null;
   role: 'STUDENT' | 'TEACHER';
-  createdAt: Timestamp;
+  createdAt: Timestamp | FieldValue;
   enrolledClassroomIds: string[];
   createdClassroomIds: string[];
 };

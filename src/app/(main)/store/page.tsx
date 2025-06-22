@@ -7,7 +7,8 @@ import { db } from "@/lib/firebase/client";
 
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ProductCard, type Product } from "@/components/product-card";
+import { ProductCard } from "@/components/product-card";
+import { type Product } from "@/lib/types";
 import { Search } from "lucide-react";
 import { CourseCardSkeleton } from "@/components/course-card-skeleton";
 
@@ -25,16 +26,7 @@ export default function StorePage() {
       try {
         const productsCollection = collection(db, "products");
         const productSnapshot = await getDocs(productsCollection);
-        const productList = productSnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            title: data.title,
-            description: data.description,
-            imageUrl: data.imageUrl,
-            subject: data.subject,
-          }
-        }) as Product[];
+        const productList = productSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
         setProducts(productList);
       } catch (error) {
         console.error("Error fetching products: ", error);

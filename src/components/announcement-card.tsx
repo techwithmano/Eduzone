@@ -37,7 +37,7 @@ export function AnnouncementCard({ announcement, onDelete }: AnnouncementCardPro
             {onDelete && (
                  <AlertDialog>
                     <AlertDialogTrigger asChild>
-                         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive">
                             <Trash2 className="h-4 w-4" />
                             <span className="sr-only">Delete Announcement</span>
                          </Button>

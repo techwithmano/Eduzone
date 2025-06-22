@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { type Assignment } from "@/lib/types";
 import { format } from "date-fns";
 import { Button } from "./ui/button";
@@ -47,8 +47,8 @@ export function AssignmentCard({ assignment, classroomId, isTeacher = false, onD
               {onDelete && (
                 <AlertDialog>
                     <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
-                            <Trash2 className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
                             <span className="sr-only">Delete</span>
                         </Button>
                     </AlertDialogTrigger>

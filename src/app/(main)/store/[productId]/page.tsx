@@ -9,7 +9,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { useAuth } from "@/components/providers/auth-provider";
 
-import { type Product } from "@/components/product-card";
+import { type Product } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -63,6 +63,10 @@ export default function ProductPage() {
 
     const handleBuyNow = () => {
         if (!user) {
+            toast({
+                title: "Please log in",
+                description: "You need to be logged in to purchase items.",
+            });
             router.push('/auth');
         } else {
             toast({
@@ -107,7 +111,7 @@ export default function ProductPage() {
     return (
         <div className="bg-background">
             <div className="container py-8 md:py-12">
-                <Button variant="ghost" asChild className="mb-8">
+                <Button variant="ghost" asChild className="mb-8 -ml-4">
                     <Link href="/store">
                         <ArrowLeft className="mr-2 h-4 w-4" />
                         Back to Store

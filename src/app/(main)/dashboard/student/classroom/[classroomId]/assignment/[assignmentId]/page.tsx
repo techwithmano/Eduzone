@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
 import { useForm } from "react-hook-form";
@@ -20,8 +20,6 @@ import { ArrowLeft, CheckCircle, Loader2, History } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from '@/hooks/use-toast';
-import { Badge } from '@/components/ui/badge';
-
 
 const submissionSchema = z.object({
   content: z.string().min(10, "Submission must be at least 10 characters long.").max(5000, "Submission cannot exceed 5000 characters."),
@@ -53,7 +51,7 @@ export default function StudentAssignmentPage() {
         return;
     }
 
-    const fetchAssignmentAndSubmission = async () => {
+    const fetchAssignment = async () => {
         setLoading(true);
         try {
             const assignmentDocRef = doc(db, `classrooms/${classroomId}/assignments`, assignmentId);
@@ -63,27 +61,41 @@ export default function StudentAssignmentPage() {
             } else {
                 toast({ variant: 'destructive', title: 'Error', description: 'Assignment not found.' });
                 router.push(`/dashboard/student/classroom/${classroomId}`);
-                return;
-            }
-
-            const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, user.uid);
-            const submissionDoc = await getDoc(submissionDocRef);
-            if (submissionDoc.exists()) {
-                const subData = { id: submissionDoc.id, ...submissionDoc.data() } as Submission;
-                setSubmission(subData);
-                form.reset({ content: subData.content });
             }
         } catch (error) {
-            console.error("Error fetching data:", error);
+            console.error("Error fetching assignment:", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to load assignment data.' });
         } finally {
             setLoading(false);
         }
     };
 
-    fetchAssignmentAndSubmission();
+    fetchAssignment();
 
-  }, [classroomId, assignmentId, user, authLoading, router, toast, form]);
+  }, [classroomId, assignmentId, user, authLoading, router, toast]);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, user.uid);
+    const unsubscribe = onSnapshot(submissionDocRef, (submissionDoc) => {
+        if (submissionDoc.exists()) {
+            const subData = { id: submissionDoc.id, ...submissionDoc.data() } as Submission;
+            setSubmission(subData);
+            if(form.getValues('content') !== subData.content) {
+              form.reset({ content: subData.content });
+            }
+        } else {
+            setSubmission(null);
+        }
+    }, (error) => {
+        console.error("Error fetching submission:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not load submission status.' });
+    });
+
+    return () => unsubscribe();
+
+  }, [classroomId, assignmentId, user, toast, form]);
 
   const onSubmit = async (values: z.infer<typeof submissionSchema>) => {
     if (!user || !assignment) return;
@@ -91,7 +103,7 @@ export default function StudentAssignmentPage() {
     try {
         const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, user.uid);
         
-        const submissionData: Partial<Submission> = {
+        const submissionData: Omit<Submission, 'id'> = {
             studentId: user.uid,
             studentName: user.displayName || 'Anonymous Student',
             content: values.content,
@@ -99,13 +111,11 @@ export default function StudentAssignmentPage() {
         };
 
         if(submission) {
-            // This is a resubmission, keep original submission time if needed, but we'll overwrite for simplicity
             submissionData.resubmittedAt = serverTimestamp() as any;
         }
 
         await setDoc(submissionDocRef, submissionData, { merge: true });
         
-        setSubmission(prev => ({ ...prev, ...submissionData, id: user.uid } as Submission));
         toast({ title: 'Success!', description: `Your work for "${assignment.title}" has been submitted.` });
     } catch (error) {
         console.error("Error submitting work:", error);
@@ -158,7 +168,7 @@ export default function StudentAssignmentPage() {
             </div>
             {assignment.description && (
                 <Card>
-                    <CardHeader><CardTitle className="text-lg">Instructions</CardTitle></CardHeader>
+                    <CardHeader><CardTitle>Instructions</CardTitle></CardHeader>
                     <CardContent>
                         <p className="text-muted-foreground whitespace-pre-wrap">{assignment.description}</p>
                     </CardContent>

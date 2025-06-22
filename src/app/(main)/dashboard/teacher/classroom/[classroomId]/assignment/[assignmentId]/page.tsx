@@ -13,7 +13,7 @@ import { type Assignment, type Submission } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, User, Calendar } from 'lucide-react';
+import { ArrowLeft, User, Calendar, Check, Circle } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -159,17 +159,18 @@ export default function TeacherAssignmentPage() {
                                 {submissions.map(submission => (
                                     <TableRow key={submission.id}>
                                         <TableCell className="font-medium">{submission.studentName}</TableCell>
-                                        <TableCell>{format(submission.submittedAt.toDate(), 'PPP p')}</TableCell>
+                                        <TableCell>{submission.submittedAt ? format(submission.submittedAt.toDate(), 'PPP p') : 'N/A'}</TableCell>
                                         <TableCell className="text-right">
                                             <Dialog>
                                                 <DialogTrigger asChild>
                                                     <Button variant="outline" size="sm">View & Grade</Button>
                                                 </DialogTrigger>
-                                                <DialogContent className="sm:max-w-xl">
+                                                <DialogContent className="sm:max-w-2xl">
                                                     <DialogHeader>
                                                         <DialogTitle>Submission from {submission.studentName}</DialogTitle>
                                                         <DialogDescription>
-                                                            Submitted on {format(submission.submittedAt.toDate(), 'PPP p')}
+                                                           Submitted on {submission.submittedAt ? format(submission.submittedAt.toDate(), 'PPP p') : 'N/A'}
+                                                           {submission.resubmittedAt && ` (Resubmitted on ${format(submission.resubmittedAt.toDate(), 'PPP p')})`}
                                                         </DialogDescription>
                                                     </DialogHeader>
                                                     <ScrollArea className="h-64 mt-4 p-4 border rounded-md bg-secondary/50">
@@ -185,7 +186,9 @@ export default function TeacherAssignmentPage() {
                         </Table>
                     </div>
                 ) : (
-                    <p className="text-center text-muted-foreground py-8">No submissions yet.</p>
+                    <div className="text-center py-10">
+                        <p className="text-muted-foreground">No submissions yet.</p>
+                    </div>
                 )}
             </CardContent>
         </Card>

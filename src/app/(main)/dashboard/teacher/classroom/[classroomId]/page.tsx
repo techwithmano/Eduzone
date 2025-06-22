@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { doc, getDoc, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, deleteDoc, Unsubscribe } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
 import { type Classroom, type Announcement, type Assignment } from '@/lib/types';
@@ -128,6 +128,8 @@ export default function TeacherClassroomPage() {
     }
 
     const classroomDocRef = doc(db, "classrooms", classroomId);
+    let unsubscribers: Unsubscribe[] = [];
+
     const getPageData = async () => {
         setLoading(true);
         try {
@@ -137,10 +139,12 @@ export default function TeacherClassroomPage() {
             } else {
                 toast({ variant: "destructive", title: "Access Denied", description: "Classroom not found or you are not the owner." });
                 router.push('/dashboard/teacher');
+                return;
             }
         } catch (error) {
             console.error("Error fetching classroom: ", error);
             router.push('/dashboard/teacher');
+            return;
         } finally {
             setLoading(false);
         }
@@ -151,15 +155,16 @@ export default function TeacherClassroomPage() {
     const announcementsUnsub = onSnapshot(announcementsQuery, (snapshot) => {
       setAnnouncements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement)));
     });
+    unsubscribers.push(announcementsUnsub);
 
     const assignmentsQuery = query(collection(db, `classrooms/${classroomId}/assignments`), orderBy('createdAt', 'desc'));
     const assignmentsUnsub = onSnapshot(assignmentsQuery, (snapshot) => {
       setAssignments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Assignment)));
     });
+    unsubscribers.push(assignmentsUnsub);
 
     return () => {
-      announcementsUnsub();
-      assignmentsUnsub();
+      unsubscribers.forEach(unsub => unsub());
     };
 
   }, [classroomId, user, authLoading, router, toast]);
@@ -305,7 +310,9 @@ export default function TeacherClassroomPage() {
                   <AssignmentCard key={assignment.id} classroomId={classroomId} assignment={assignment} isTeacher onDelete={() => handleDeleteAssignment(assignment.id)} />
                 ))
               ) : (
-                <p className="text-muted-foreground text-center py-4">No assignments created yet.</p>
+                 <div className="text-center py-10">
+                    <p className="text-muted-foreground">No assignments created yet.</p>
+                </div>
               )}
             </CardContent>
           </Card>

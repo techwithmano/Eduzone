@@ -172,7 +172,7 @@ export default function EnrollmentsPage() {
 
         await batch.commit();
 
-        setEnrolledStudents(enrolledStudents.filter(s => s.id !== studentToRemove.id));
+        setEnrolledStudents(currentStudents => currentStudents.filter(s => s.id !== studentToRemove!.id));
         toast({
             title: "Student Removed",
             description: `"${studentToRemove.displayName}" has been removed from the classroom.`,
@@ -289,7 +289,7 @@ export default function EnrollmentsPage() {
                                                 <TableCell>{student.email}</TableCell>
                                                 <TableCell className="text-right">
                                                     <Button variant="ghost" size="icon" onClick={() => handleRemoveClick(student)} title="Remove Student">
-                                                        <Trash2 className="h-4 w-4" />
+                                                        <Trash2 className="h-4 w-4 text-destructive" />
                                                         <span className="sr-only">Remove</span>
                                                     </Button>
                                                 </TableCell>

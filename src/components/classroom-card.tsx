@@ -12,7 +12,7 @@ interface ClassroomCardProps {
 
 export function ClassroomCard({ classroom }: ClassroomCardProps) {
   return (
-    <Card className="flex flex-col">
+    <Card className="flex flex-col hover:shadow-lg transition-shadow duration-300">
       <CardHeader className="p-0">
         <div className="relative aspect-video">
           <Image
@@ -31,7 +31,7 @@ export function ClassroomCard({ classroom }: ClassroomCardProps) {
         <CardTitle className="text-lg font-semibold mb-2 line-clamp-2">{classroom.title}</CardTitle>
         <p className="text-sm text-muted-foreground flex-1 line-clamp-3">{classroom.description}</p>
       </CardContent>
-      <CardFooter className="p-4 flex justify-between items-center">
+      <CardFooter className="p-4">
         <Button asChild className="w-full">
             <Link href={`/dashboard/student/classroom/${classroom.id}`}>View Classroom</Link>
         </Button>

@@ -26,7 +26,7 @@ export default function Home() {
                     <Link href="/dashboard">Get Started</Link>
                   </Button>
                   <Button asChild variant="outline" size="lg">
-                    <Link href="/store">Explore Courses</Link>
+                    <Link href="/store">Explore Resources</Link>
                   </Button>
                 </div>
               </div>
@@ -104,7 +104,7 @@ export default function Home() {
             <div className="mx-auto grid max-w-5xl items-start gap-8 sm:grid-cols-2 md:gap-12 lg:grid-cols-3 mt-8">
                 <Card className="text-left">
                     <CardContent className="p-6">
-                        <p className="mb-4">"EduZone has revolutionized how I manage my classroom. The AI-powered tools save me so much time!"</p>
+                        <p className="mb-4">"EduZone has revolutionized how I manage my classroom. The tools are intuitive and save me so much time!"</p>
                         <div className="flex items-center gap-3">
                             <Avatar>
                                 <AvatarImage src="https://placehold.co/40x40.png" />
