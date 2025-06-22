@@ -4,7 +4,7 @@
 import { useAuth } from "@/components/providers/auth-provider";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, documentId } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -33,28 +33,25 @@ export default function StudentDashboardPage() {
       if (!user) return;
       setLoading(true);
       try {
-        const enrollmentsQuery = query(collection(db, "enrollments"), where("studentId", "==", user.uid));
-        const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
-        
-        if (enrollmentsSnapshot.empty) {
-          setCourses([]);
-          setLoading(false);
-          return;
+        // 1. Get the student's user document
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const courseIds = userData.enrolledCourseIds || [];
+          
+          if (courseIds.length > 0) {
+            // 2. Fetch the courses using the array of IDs
+            const coursesQuery = query(collection(db, "products"), where(documentId(), "in", courseIds));
+            const coursesSnapshot = await getDocs(coursesQuery);
+            
+            const fetchedCourses = coursesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course));
+            setCourses(fetchedCourses);
+          } else {
+            setCourses([]);
+          }
         }
-
-        const coursePromises = enrollmentsSnapshot.docs.map(enrollment => {
-          const courseId = enrollment.data().courseId;
-          const courseDocRef = doc(db, "products", courseId);
-          return getDoc(courseDocRef);
-        });
-
-        const courseDocs = await Promise.all(coursePromises);
-
-        const fetchedCourses = courseDocs
-          .filter(doc => doc.exists())
-          .map(doc => ({ id: doc.id, ...doc.data() } as Course));
-        
-        setCourses(fetchedCourses);
       } catch (error) {
         console.error("Error fetching enrolled courses: ", error);
       } finally {

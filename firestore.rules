@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -7,36 +8,25 @@ service cloud.firestore {
     }
 
     match /products/{productId} {
-      // Anyone can read a course/product.
+      // Anyone can read products (courses)
       allow read: if true;
-      // Only teachers can modify courses/products.
-      allow create, update, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
+      // Only teachers can create, update, or delete them
+      allow create, update, delete: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
     }
     
     match /users/{userId} {
-      // A user can get their own document.
+      // A user can read their own document
       allow get: if request.auth.uid == userId;
-      // A teacher can search the list of users (e.g., by email).
-      allow list: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
-      // A new user can create their own document.
-      allow create: if request.auth.uid == userId;
-    }
-    
-    match /enrollments/{enrollmentId} {
-      // Teachers can read any enrollment document.
-      // Students can read an enrollment document ONLY if their studentId is on it.
-      allow get: if request.auth != null &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER' ||
-         resource.data.studentId == request.auth.uid);
-
-      // Teachers can query any enrollments.
-      // Students can query enrollments ONLY IF they filter by their own studentId.
-      allow list: if request.auth != null &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER' ||
-         request.query.where.studentId == request.auth.uid);
       
-      // Only teachers can create or delete enrollments.
-      allow create, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
+      // A teacher can search for users or get a list of students in a course
+      allow list: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
+      
+      // A new user can create their own document
+      allow create: if request.auth.uid == userId;
+
+      // A teacher can update a user's doc (e.g. to enroll them in a course)
+      // A user can also update their own document
+      allow update: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER' || request.auth.uid == userId;
     }
   }
 }

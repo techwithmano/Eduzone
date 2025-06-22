@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { collection, doc, getDoc, addDoc, getDocs, query, where, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 
 import { type Course } from "@/components/product-card";
@@ -34,11 +34,10 @@ const addStudentSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
 });
 
-type Enrollment = {
-  id: string;
-  studentId: string;
-  studentName: string;
-  studentEmail: string;
+type EnrolledStudent = {
+  id: string; // This is the user's UID
+  displayName: string;
+  email: string;
 };
 
 export default function EnrollmentsPage() {
@@ -48,10 +47,10 @@ export default function EnrollmentsPage() {
   const courseId = params.courseId as string;
 
   const [course, setCourse] = useState<Course | null>(null);
-  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [enrolledStudents, setEnrolledStudents] = useState<EnrolledStudent[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [studentToRemove, setStudentToRemove] = useState<Enrollment | null>(null);
+  const [studentToRemove, setStudentToRemove] = useState<EnrolledStudent | null>(null);
 
   const form = useForm<z.infer<typeof addStudentSchema>>({
     resolver: zodResolver(addStudentSchema),
@@ -74,15 +73,15 @@ export default function EnrollmentsPage() {
         }
         setCourse({ id: courseDoc.id, ...courseDoc.data() } as Course);
 
-        // Fetch enrollments
-        const enrollmentsQuery = query(collection(db, "enrollments"), where("courseId", "==", courseId));
-        const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
-        const fetchedEnrollments = enrollmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Enrollment[];
-        setEnrollments(fetchedEnrollments);
+        // Fetch enrolled students using array-contains query
+        const studentsQuery = query(collection(db, "users"), where("enrolledCourseIds", "array-contains", courseId));
+        const studentsSnapshot = await getDocs(studentsQuery);
+        const fetchedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as EnrolledStudent[];
+        setEnrolledStudents(fetchedStudents);
 
       } catch (error) {
         console.error("Error fetching data:", error);
-        toast({ variant: "destructive", title: "Failed to load data" });
+        toast({ variant: "destructive", title: "Failed to load data", description: "You may need to create a Firestore index. Check the browser console for a link." });
       } finally {
         setLoading(false);
       }
@@ -111,30 +110,26 @@ export default function EnrollmentsPage() {
         return;
       }
 
-      // 2. Check if already enrolled
-      const isEnrolled = enrollments.some(e => e.studentId === studentDoc.id);
+      // 2. Check if already enrolled (client-side)
+      const isEnrolled = enrolledStudents.some(s => s.id === studentDoc.id);
       if (isEnrolled) {
         toast({ variant: "destructive", title: "Already Enrolled", description: "This student is already enrolled in this course." });
         return;
       }
 
-      // 3. Create enrollment
-      const newEnrollmentRef = await addDoc(collection(db, "enrollments"), {
-        courseId: courseId,
-        studentId: studentDoc.id,
-        studentName: studentData.displayName,
-        studentEmail: studentData.email,
-        enrolledAt: serverTimestamp(),
+      // 3. Update user document with the new course ID
+      const studentDocRef = doc(db, "users", studentDoc.id);
+      await updateDoc(studentDocRef, {
+        enrolledCourseIds: arrayUnion(courseId)
       });
       
-      const newEnrollment: Enrollment = {
-        id: newEnrollmentRef.id,
-        studentId: studentDoc.id,
-        studentName: studentData.displayName,
-        studentEmail: studentData.email
+      const newStudent: EnrolledStudent = {
+        id: studentDoc.id,
+        displayName: studentData.displayName,
+        email: studentData.email
       };
 
-      setEnrollments([...enrollments, newEnrollment]);
+      setEnrolledStudents([...enrolledStudents, newStudent]);
       form.reset();
       toast({ title: "Student Enrolled!", description: `${studentData.displayName} has been added to the course.`});
 
@@ -146,19 +141,22 @@ export default function EnrollmentsPage() {
     }
   };
 
-  const handleRemoveClick = (enrollment: Enrollment) => {
-    setStudentToRemove(enrollment);
+  const handleRemoveClick = (student: EnrolledStudent) => {
+    setStudentToRemove(student);
   };
   
   const handleRemoveConfirm = async () => {
     if (!studentToRemove) return;
 
     try {
-        await deleteDoc(doc(db, "enrollments", studentToRemove.id));
-        setEnrollments(enrollments.filter(e => e.id !== studentToRemove.id));
+        const studentDocRef = doc(db, "users", studentToRemove.id);
+        await updateDoc(studentDocRef, {
+            enrolledCourseIds: arrayRemove(courseId)
+        });
+        setEnrolledStudents(enrolledStudents.filter(s => s.id !== studentToRemove.id));
         toast({
             title: "Student Removed",
-            description: `"${studentToRemove.studentName}" has been removed from the course.`,
+            description: `"${studentToRemove.displayName}" has been removed from the course.`,
         });
     } catch (error) {
         console.error("Error removing student: ", error);
@@ -195,7 +193,7 @@ export default function EnrollmentsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove "{studentToRemove?.studentName}" from the course. They will lose access to all course materials. This action cannot be undone.
+              This will remove "{studentToRemove?.displayName}" from the course. They will lose access to all course materials. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -248,14 +246,14 @@ export default function EnrollmentsPage() {
                     <CardHeader>
                         <CardTitle>Enrolled Students</CardTitle>
                         <CardDescription>
-                          {enrollments.length > 0 
-                            ? `There are ${enrollments.length} student(s) enrolled in this course.`
+                          {enrolledStudents.length > 0 
+                            ? `There are ${enrolledStudents.length} student(s) enrolled in this course.`
                             : "No students are enrolled in this course yet."
                           }
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {enrollments.length > 0 ? (
+                        {enrolledStudents.length > 0 ? (
                              <div className="border rounded-md">
                                 <Table>
                                     <TableHeader>
@@ -266,12 +264,12 @@ export default function EnrollmentsPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {enrollments.map((enrollment) => (
-                                            <TableRow key={enrollment.id}>
-                                                <TableCell className="font-medium">{enrollment.studentName}</TableCell>
-                                                <TableCell>{enrollment.studentEmail}</TableCell>
+                                        {enrolledStudents.map((student) => (
+                                            <TableRow key={student.id}>
+                                                <TableCell className="font-medium">{student.displayName}</TableCell>
+                                                <TableCell>{student.email}</TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button variant="ghost" size="icon" onClick={() => handleRemoveClick(enrollment)} title="Remove Student">
+                                                    <Button variant="ghost" size="icon" onClick={() => handleRemoveClick(student)} title="Remove Student">
                                                         <Trash2 className="h-4 w-4" />
                                                         <span className="sr-only">Remove</span>
                                                     </Button>
