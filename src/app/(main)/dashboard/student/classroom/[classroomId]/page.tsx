@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { doc, getDoc, collection, query, orderBy, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
+import { useToast } from '@/hooks/use-toast';
 
 import { type Classroom, type Announcement, type Assignment } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ export default function StudentClassroomPage() {
   const params = useParams();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
   const classroomId = params.classroomId as string;
 
   const [classroom, setClassroom] = useState<Classroom | null>(null);
@@ -69,7 +71,7 @@ export default function StudentClassroomPage() {
     };
 
     fetchClassroom();
-  }, [classroomId, user, authLoading, router]);
+  }, [classroomId, user, authLoading, router, toast]);
 
    useEffect(() => {
     if (!classroomId) return;
