@@ -56,3 +56,36 @@ export type Submission = {
   submittedAt: Timestamp;
   resubmittedAt?: Timestamp;
 };
+
+export type Material = {
+  id: string;
+  title: string;
+  description?: string;
+  link: string;
+  createdAt: Timestamp;
+};
+
+export type QuizQuestion = {
+    id: string;
+    question: string;
+    options: string[];
+    correctAnswer: number; // index of the correct option
+};
+
+export type Quiz = {
+  id: string;
+  title: string;
+  description?: string;
+  questions: QuizQuestion[];
+  createdAt: Timestamp;
+};
+
+export type QuizSubmission = {
+    id: string; // Document ID is student's UID
+    studentId: string;
+    studentName: string;
+    answers: { question: string; answer: number }[];
+    score: number;
+    totalQuestions: number;
+    submittedAt: Timestamp;
+};

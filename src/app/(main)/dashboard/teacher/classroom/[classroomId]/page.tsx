@@ -4,9 +4,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { v4 as uuidv4 } from 'uuid';
 import {
   doc, getDoc, collection, addDoc, query, orderBy, onSnapshot,
   serverTimestamp, deleteDoc, Unsubscribe, updateDoc,
@@ -14,13 +15,13 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
-import { type Classroom, type Announcement, type Assignment, type UserProfile } from '@/lib/types';
+import { type Classroom, type Announcement, type Assignment, type UserProfile, type Material, type Quiz, type QuizQuestion } from '@/lib/types';
 import { format } from "date-fns";
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Loader2, Megaphone, FileText, Plus, CalendarIcon, Settings, Users, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Megaphone, FileText, Plus, CalendarIcon, Settings, Users, Trash2, Notebook, BookOpen, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,6 +29,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from '@/hooks/use-toast';
 import { AnnouncementCard } from '@/components/announcement-card';
 import { AssignmentCard } from '@/components/assignment-card';
+import { MaterialCard } from '@/components/material-card';
+import { QuizCard } from '@/components/quiz-card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -36,6 +39,7 @@ import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const announcementSchema = z.object({
   content: z.string().min(10, "Announcement must be at least 10 characters.").max(1000, "Announcement cannot exceed 1000 characters."),
@@ -45,6 +49,24 @@ const assignmentSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters.").max(100, "Title cannot exceed 100 characters."),
   description: z.string().max(5000, "Description cannot exceed 5000 characters.").optional(),
   dueDate: z.date({ required_error: "A due date is required."}),
+});
+
+const materialSchema = z.object({
+  title: z.string().min(3, "Title must be at least 3 characters.").max(100),
+  description: z.string().max(5000).optional(),
+  link: z.string().url("Please enter a valid URL."),
+});
+
+const quizQuestionSchema = z.object({
+    id: z.string(),
+    question: z.string().min(5, "Question must be at least 5 characters."),
+    options: z.array(z.string().min(1, "Option cannot be empty.")).length(4, "Please provide 4 options."),
+    correctAnswer: z.coerce.number().min(0).max(3),
+});
+const quizSchema = z.object({
+    title: z.string().min(3, "Title must be at least 3 characters.").max(100),
+    description: z.string().max(5000).optional(),
+    questions: z.array(quizQuestionSchema).min(1, "Please add at least one question."),
 });
 
 const editClassroomSchema = z.object({
@@ -69,77 +91,87 @@ export default function TeacherClassroomPage() {
   const [classroom, setClassroom] = useState<Classroom | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [enrolledStudents, setEnrolledStudents] = useState<EnrolledStudent[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
+  const [isMaterialDialogOpen, setIsMaterialDialogOpen] = useState(false);
+  const [isQuizDialogOpen, setIsQuizDialogOpen] = useState(false);
   const [studentToRemove, setStudentToRemove] = useState<EnrolledStudent | null>(null);
 
   const announcementForm = useForm<z.infer<typeof announcementSchema>>({ resolver: zodResolver(announcementSchema), defaultValues: { content: "" } });
   const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema) });
+  const materialForm = useForm<z.infer<typeof materialSchema>>({ resolver: zodResolver(materialSchema) });
+  const quizForm = useForm<z.infer<typeof quizSchema>>({ resolver: zodResolver(quizSchema), defaultValues: { title: "", description: "", questions: [] }});
+  const { fields: quizQuestions, append: appendQuizQuestion, remove: removeQuizQuestion } = useFieldArray({ control: quizForm.control, name: "questions" });
+  
   const editClassroomForm = useForm<z.infer<typeof editClassroomSchema>>({ resolver: zodResolver(editClassroomSchema) });
   const addStudentForm = useForm<z.infer<typeof addStudentSchema>>({ resolver: zodResolver(addStudentSchema), defaultValues: { email: "" } });
 
-  // Announcements
-  const handleCreateAnnouncement = async (values: z.infer<typeof announcementSchema>) => {
+  const simpleCreate = (collectionName: string) => async (data: any) => {
     if (!user) return;
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, `classrooms/${classroomId}/announcements`), {
-        content: values.content,
-        authorId: user.uid,
-        authorName: user.displayName || 'Teacher',
+      await addDoc(collection(db, `classrooms/${classroomId}/${collectionName}`), {
+        ...data,
         createdAt: serverTimestamp(),
       });
-      announcementForm.reset({ content: "" });
-      toast({ title: "Announcement posted!" });
+      toast({ title: `${collectionName.slice(0, -1)} created!` });
+      return true;
     } catch (error) {
-      console.error("Error posting announcement:", error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to post announcement." });
+      console.error(`Error creating ${collectionName}:`, error);
+      toast({ variant: "destructive", title: "Error", description: `Failed to create ${collectionName}.` });
+      return false;
     } finally {
       setIsSubmitting(false);
     }
   };
-  const handleDeleteAnnouncement = async (announcementId: string) => {
-    try {
-      await deleteDoc(doc(db, `classrooms/${classroomId}/announcements`, announcementId));
-      toast({ title: "Announcement deleted." });
-    } catch (error) {
-       console.error("Error deleting announcement:", error);
-       toast({ variant: "destructive", title: "Error", description: "Failed to delete announcement." });
-    }
-  }
 
-  // Assignments
-  const handleCreateAssignment = async (values: z.infer<typeof assignmentSchema>) => {
-    if (!user) return;
-    setIsSubmitting(true);
+  const simpleDelete = (collectionName: string) => async (docId: string) => {
     try {
-      await addDoc(collection(db, `classrooms/${classroomId}/assignments`), {
-        ...values,
-        createdAt: serverTimestamp(),
-      });
+        await deleteDoc(doc(db, `classrooms/${classroomId}/${collectionName}`, docId));
+        toast({ title: `${collectionName.slice(0,-1)} deleted.` });
+    } catch (error) {
+        console.error(`Error deleting ${collectionName}:`, error);
+        toast({ variant: "destructive", title: "Error", description: `Failed to delete.` });
+    }
+  };
+
+  const handleCreateAnnouncement = simpleCreate('announcements');
+  const handleDeleteAnnouncement = simpleDelete('announcements');
+  const handleCreateAssignment = simpleCreate('assignments');
+  const handleDeleteAssignment = simpleDelete('assignments');
+  const handleCreateMaterial = simpleCreate('materials');
+  const handleDeleteMaterial = simpleDelete('materials');
+  const handleCreateQuiz = simpleCreate('quizzes');
+  const handleDeleteQuiz = simpleDelete('quizzes');
+
+  const onAssignmentSubmit = async (values: z.infer<typeof assignmentSchema>) => {
+    const success = await handleCreateAssignment(values);
+    if (success) {
       assignmentForm.reset();
       setIsAssignmentDialogOpen(false);
-      toast({ title: "Assignment created!" });
-    } catch (error) {
-      console.error("Error creating assignment:", error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to create assignment." });
-    } finally {
-      setIsSubmitting(false);
     }
   };
-   const handleDeleteAssignment = async (assignmentId: string) => {
-    try {
-      await deleteDoc(doc(db, `classrooms/${classroomId}/assignments`, assignmentId));
-      toast({ title: "Assignment deleted." });
-    } catch (error) {
-       console.error("Error deleting assignment:", error);
-       toast({ variant: "destructive", title: "Error", description: "Failed to delete assignment." });
+  const onMaterialSubmit = async (values: z.infer<typeof materialSchema>) => {
+    const success = await handleCreateMaterial(values);
+    if (success) {
+      materialForm.reset();
+      setIsMaterialDialogOpen(false);
     }
-  }
-
+  };
+   const onQuizSubmit = async (values: z.infer<typeof quizSchema>) => {
+    const success = await handleCreateQuiz(values);
+    if (success) {
+      quizForm.reset();
+      setIsQuizDialogOpen(false);
+    }
+  };
+  
   // Student Management
   const fetchEnrolledStudents = useCallback(async (studentIds: string[]) => {
       if (studentIds.length > 0) {
@@ -252,13 +284,14 @@ export default function TeacherClassroomPage() {
       return;
     }
 
-    const classroomDocRef = doc(db, "classrooms", classroomId);
     let unsubscribers: Unsubscribe[] = [];
 
     const getPageData = async () => {
         setLoading(true);
         try {
+            const classroomDocRef = doc(db, "classrooms", classroomId);
             const classroomDoc = await getDoc(classroomDocRef);
+
             if (classroomDoc.exists() && classroomDoc.data().creatorId === user.uid) {
                 const classroomData = { id: classroomDoc.id, ...classroomDoc.data() } as Classroom;
                 setClassroom(classroomData);
@@ -267,18 +300,21 @@ export default function TeacherClassroomPage() {
                     await fetchEnrolledStudents(classroomData.enrolledStudentIds);
                 }
 
-                // Setup listeners after initial data load
-                const announcementsQuery = query(collection(db, `classrooms/${classroomId}/announcements`), orderBy('createdAt', 'desc'));
-                const unsubAnnouncements = onSnapshot(announcementsQuery, (snapshot) => {
-                  setAnnouncements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement)));
-                });
-                unsubscribers.push(unsubAnnouncements);
+                // Setup listeners
+                const collectionsToListen = {
+                    announcements: setAnnouncements,
+                    assignments: setAssignments,
+                    materials: setMaterials,
+                    quizzes: setQuizzes,
+                };
 
-                const assignmentsQuery = query(collection(db, `classrooms/${classroomId}/assignments`), orderBy('createdAt', 'desc'));
-                const unsubAssignments = onSnapshot(assignmentsQuery, (snapshot) => {
-                  setAssignments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Assignment)));
+                Object.entries(collectionsToListen).forEach(([name, setter]) => {
+                    const q = query(collection(db, `classrooms/${classroomId}/${name}`), orderBy('createdAt', 'desc'));
+                    const unsub = onSnapshot(q, (snapshot) => {
+                        setter(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any);
+                    });
+                    unsubscribers.push(unsub);
                 });
-                unsubscribers.push(unsubAssignments);
 
             } else {
                 toast({ variant: "destructive", title: "Access Denied", description: "Classroom not found or you are not the owner." });
@@ -293,9 +329,7 @@ export default function TeacherClassroomPage() {
     }
     getPageData();
     
-    return () => {
-      unsubscribers.forEach(unsub => unsub());
-    };
+    return () => unsubscribers.forEach(unsub => unsub());
 
   }, [classroomId, user, authLoading, router, toast, editClassroomForm, fetchEnrolledStudents]);
 
@@ -335,9 +369,11 @@ export default function TeacherClassroomPage() {
         </div>
 
         <Tabs defaultValue="announcements" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-6">
             <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
             <TabsTrigger value="assignments"><FileText className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
+            <TabsTrigger value="quizzes"><Notebook className="mr-2 h-4 w-4" />Quizzes</TabsTrigger>
+            <TabsTrigger value="materials"><BookOpen className="mr-2 h-4 w-4" />Materials</TabsTrigger>
             <TabsTrigger value="students"><Users className="mr-2 h-4 w-4" />Students</TabsTrigger>
             <TabsTrigger value="settings"><Settings className="mr-2 h-4 w-4" />Settings</TabsTrigger>
           </TabsList>
@@ -401,7 +437,7 @@ export default function TeacherClassroomPage() {
                         <DialogDescription>Fill in the details for the new assignment.</DialogDescription>
                       </DialogHeader>
                       <Form {...assignmentForm}>
-                        <form onSubmit={assignmentForm.handleSubmit(handleCreateAssignment)} className="grid gap-4 py-4">
+                        <form onSubmit={assignmentForm.handleSubmit(onAssignmentSubmit)} className="grid gap-4 py-4">
                             <FormField control={assignmentForm.control} name="title" render={({ field }) => ( <FormItem><FormLabel>Title</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                             <FormField control={assignmentForm.control} name="description" render={({ field }) => ( <FormItem><FormLabel>Description (optional)</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem> )} />
                             <FormField control={assignmentForm.control} name="dueDate" render={({ field }) => (
@@ -445,6 +481,148 @@ export default function TeacherClassroomPage() {
                    <div className="text-center py-10">
                       <p className="text-muted-foreground">No assignments created yet.</p>
                   </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+           {/* Quizzes Tab */}
+          <TabsContent value="quizzes">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                  <div>
+                    <CardTitle>Quizzes</CardTitle>
+                    <CardDescription>Create and manage quizzes for your students.</CardDescription>
+                  </div>
+                  <Dialog open={isQuizDialogOpen} onOpenChange={setIsQuizDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button><Plus className="mr-2 h-4 w-4" />Create Quiz</Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-3xl">
+                      <DialogHeader>
+                        <DialogTitle>New Quiz</DialogTitle>
+                        <DialogDescription>Build a new quiz for your students.</DialogDescription>
+                      </DialogHeader>
+                      <Form {...quizForm}>
+                        <form onSubmit={quizForm.handleSubmit(onQuizSubmit)} className="space-y-6">
+                            <ScrollArea className="h-[60vh] p-4">
+                                <div className="space-y-4">
+                                  <FormField control={quizForm.control} name="title" render={({ field }) => ( <FormItem><FormLabel>Quiz Title</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                  <FormField control={quizForm.control} name="description" render={({ field }) => ( <FormItem><FormLabel>Description (optional)</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                  
+                                  <Separator />
+                                  
+                                  <div>
+                                      {quizQuestions.map((field, index) => (
+                                          <Card key={field.id} className="mb-4">
+                                              <CardHeader>
+                                                  <div className="flex justify-between items-center">
+                                                      <CardTitle>Question {index + 1}</CardTitle>
+                                                      <Button type="button" variant="ghost" size="icon" onClick={() => removeQuizQuestion(index)}>
+                                                          <X className="h-4 w-4" />
+                                                      </Button>
+                                                  </div>
+                                              </CardHeader>
+                                              <CardContent className="space-y-4">
+                                                  <FormField control={quizForm.control} name={`questions.${index}.question`} render={({ field }) => ( <FormItem><FormLabel>Question Text</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                                  <div className="grid grid-cols-2 gap-4">
+                                                      {[0, 1, 2, 3].map(optionIndex => (
+                                                          <FormField key={optionIndex} control={quizForm.control} name={`questions.${index}.options.${optionIndex}`} render={({ field }) => ( <FormItem><FormLabel>Option {optionIndex + 1}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                                      ))}
+                                                  </div>
+                                                  <FormField control={quizForm.control} name={`questions.${index}.correctAnswer`} render={({ field }) => (
+                                                      <FormItem>
+                                                          <FormLabel>Correct Answer</FormLabel>
+                                                          <Select onValueChange={field.onChange} defaultValue={String(field.value)}>
+                                                              <FormControl><SelectTrigger><SelectValue placeholder="Select correct option" /></SelectTrigger></FormControl>
+                                                              <SelectContent>
+                                                                  <SelectItem value="0">Option 1</SelectItem>
+                                                                  <SelectItem value="1">Option 2</SelectItem>
+                                                                  <SelectItem value="2">Option 3</SelectItem>
+                                                                  <SelectItem value="3">Option 4</SelectItem>
+                                                              </SelectContent>
+                                                          </Select>
+                                                          <FormMessage />
+                                                      </FormItem>
+                                                  )}/>
+                                              </CardContent>
+                                          </Card>
+                                      ))}
+                                  </div>
+                                  <Button type="button" variant="outline" onClick={() => appendQuizQuestion({ id: uuidv4(), question: '', options: ['', '', '', ''], correctAnswer: 0})}>
+                                      <Plus className="mr-2 h-4 w-4" />Add Question
+                                  </Button>
+                                </div>
+                            </ScrollArea>
+                            <DialogFooter>
+                                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                                <Button type="submit" disabled={isSubmitting}>
+                                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Create Quiz
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                      </Form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {quizzes.length > 0 ? (
+                  quizzes.map(quiz => (
+                    <QuizCard key={quiz.id} classroomId={classroomId} quiz={quiz} isTeacher onDelete={() => handleDeleteQuiz(quiz.id)} />
+                  ))
+                ) : (
+                   <div className="text-center py-10"><p className="text-muted-foreground">No quizzes created yet.</p></div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Materials Tab */}
+          <TabsContent value="materials">
+             <Card>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                  <div>
+                    <CardTitle>Course Materials</CardTitle>
+                    <CardDescription>Share links to articles, videos, and documents.</CardDescription>
+                  </div>
+                  <Dialog open={isMaterialDialogOpen} onOpenChange={setIsMaterialDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button><Plus className="mr-2 h-4 w-4" />Add Material</Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>New Material</DialogTitle>
+                        <DialogDescription>Add a new resource for your students.</DialogDescription>
+                      </DialogHeader>
+                      <Form {...materialForm}>
+                        <form onSubmit={materialForm.handleSubmit(onMaterialSubmit)} className="grid gap-4 py-4">
+                            <FormField control={materialForm.control} name="title" render={({ field }) => ( <FormItem><FormLabel>Title</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={materialForm.control} name="description" render={({ field }) => ( <FormItem><FormLabel>Description (optional)</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={materialForm.control} name="link" render={({ field }) => ( <FormItem><FormLabel>URL</FormLabel><FormControl><Input placeholder="https://..." {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <DialogFooter>
+                              <DialogClose asChild><Button variant="ghost">Cancel</Button></DialogClose>
+                              <Button type="submit" disabled={isSubmitting}>
+                                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                  Add
+                              </Button>
+                            </DialogFooter>
+                        </form>
+                      </Form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {materials.length > 0 ? (
+                  materials.map(material => (
+                    <MaterialCard key={material.id} material={material} isTeacher onDelete={() => handleDeleteMaterial(material.id)} />
+                  ))
+                ) : (
+                   <div className="text-center py-10"><p className="text-muted-foreground">No materials posted yet.</p></div>
                 )}
               </CardContent>
             </Card>

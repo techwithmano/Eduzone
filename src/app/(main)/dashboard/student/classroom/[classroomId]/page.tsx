@@ -9,15 +9,17 @@ import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
 import { useToast } from '@/hooks/use-toast';
 
-import { type Classroom, type Announcement, type Assignment } from '@/lib/types';
+import { type Classroom, type Announcement, type Assignment, type Quiz, type Material } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Megaphone, FileText } from 'lucide-react';
+import { ArrowLeft, Megaphone, FileText, Notebook, BookOpen } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AnnouncementCard } from '@/components/announcement-card';
 import { AssignmentCard } from '@/components/assignment-card';
+import { QuizCard } from '@/components/quiz-card';
+import { MaterialCard } from '@/components/material-card';
 
 export default function StudentClassroomPage() {
   const params = useParams();
@@ -29,6 +31,8 @@ export default function StudentClassroomPage() {
   const [classroom, setClassroom] = useState<Classroom | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -77,26 +81,23 @@ export default function StudentClassroomPage() {
     if (!classroomId) return;
     
     const unsubscribers: Unsubscribe[] = [];
+    const collections = {
+        announcements: setAnnouncements,
+        assignments: setAssignments,
+        quizzes: setQuizzes,
+        materials: setMaterials,
+    };
 
-    // Subscribe to announcements
-    const announcementsQuery = query(collection(db, `classrooms/${classroomId}/announcements`), orderBy('createdAt', 'desc'));
-    const announcementsUnsub = onSnapshot(announcementsQuery, (snapshot) => {
-      const fetchedAnnouncements = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement));
-      setAnnouncements(fetchedAnnouncements);
-    }, (err) => {
-        console.error("Error fetching announcements:", err);
+    Object.entries(collections).forEach(([collectionName, setter]) => {
+        const q = query(collection(db, `classrooms/${classroomId}/${collectionName}`), orderBy('createdAt', 'desc'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setter(items as any);
+        }, (err) => {
+            console.error(`Error fetching ${collectionName}:`, err);
+        });
+        unsubscribers.push(unsubscribe);
     });
-    unsubscribers.push(announcementsUnsub);
-
-    // Subscribe to assignments
-    const assignmentsQuery = query(collection(db, `classrooms/${classroomId}/assignments`), orderBy('createdAt', 'desc'));
-    const assignmentsUnsub = onSnapshot(assignmentsQuery, (snapshot) => {
-      const fetchedAssignments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Assignment));
-      setAssignments(fetchedAssignments);
-    }, (err) => {
-        console.error("Error fetching assignments:", err);
-    });
-    unsubscribers.push(assignmentsUnsub);
 
     return () => unsubscribers.forEach(unsub => unsub());
   }, [classroomId]);
@@ -148,10 +149,11 @@ export default function StudentClassroomPage() {
       </div>
 
        <Tabs defaultValue="announcements" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6">
           <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
           <TabsTrigger value="assignments"><FileText className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
-          <TabsTrigger value="quizzes" disabled>Quizzes</TabsTrigger>
+          <TabsTrigger value="quizzes"><Notebook className="mr-2 h-4 w-4" />Quizzes</TabsTrigger>
+          <TabsTrigger value="materials"><BookOpen className="mr-2 h-4 w-4" />Materials</TabsTrigger>
         </TabsList>
         <TabsContent value="announcements">
           <Card>
@@ -181,6 +183,38 @@ export default function StudentClassroomPage() {
                  ))
                ) : (
                 <p className="text-muted-foreground text-center py-4">No assignments have been posted yet.</p>
+               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="quizzes">
+           <Card>
+            <CardHeader>
+              <CardTitle>Quizzes</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+               {quizzes.length > 0 ? (
+                 quizzes.map(quiz => (
+                    <QuizCard key={quiz.id} classroomId={classroomId} quiz={quiz} />
+                 ))
+               ) : (
+                <p className="text-muted-foreground text-center py-4">No quizzes have been posted yet.</p>
+               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+         <TabsContent value="materials">
+           <Card>
+            <CardHeader>
+              <CardTitle>Course Materials</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+               {materials.length > 0 ? (
+                 materials.map(material => (
+                    <MaterialCard key={material.id} material={material} />
+                 ))
+               ) : (
+                <p className="text-muted-foreground text-center py-4">No materials have been posted yet.</p>
                )}
             </CardContent>
           </Card>
