@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
-import { collection, query, where, onSnapshot, orderBy, writeBatch, arrayRemove, doc, getDocs, addDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, orderBy, writeBatch, arrayRemove, doc, getDocs, addDoc, serverTimestamp, deleteDoc, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { type Classroom, type Product } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -32,6 +32,23 @@ const productSchema = z.object({
   language: z.string().min(2, "Language is required."),
   priceKWD: z.coerce.number().min(0, "Price must be a positive number."),
 });
+
+const seedProducts = [
+    { title: "English Foundation Course", category: "Foundation", language: "English", priceKWD: 10, description: "A comprehensive course to build a strong foundation in the English language, covering grammar, vocabulary, and conversational skills." },
+    { title: "Arabic Foundation Course", category: "Foundation", language: "Arabic", priceKWD: 10, description: "Master the fundamentals of Arabic. This course is perfect for beginners, focusing on script, basic grammar, and essential vocabulary." },
+    { title: "Math Foundation Course", category: "Foundation", language: "English/Arabic", priceKWD: 12, description: "Strengthen your mathematical skills with this bilingual course covering core concepts from arithmetic to pre-algebra." },
+    { title: "Kuwait Ministry Curriculum Tutoring", category: "Local Curriculum", language: "Arabic", priceKWD: 15, description: "Get expert tutoring for all subjects in the Kuwaiti Ministry of Education curriculum. Personalized for your success." },
+    { title: "American Diploma Subjects Tutoring", category: "American Diploma", language: "English", priceKWD: 20, description: "Ace your American Diploma with specialized tutoring in subjects like English, Math, Science, and Social Studies." },
+    { title: "IGCSE Subjects (Math, ICT, Biology...)", category: "IGCSE", language: "English", priceKWD: 18, description: "Prepare for your IGCSE exams with our expert-led courses in a wide range of subjects." },
+    { title: "Law Subjects Coaching", category: "University", language: "English/Arabic", priceKWD: 25, description: "Navigate the complexities of law school with our dedicated coaching for various university-level law subjects." },
+    { title: "GMAT Prep Course", category: "University Exams", language: "English", priceKWD: 30, description: "Maximize your GMAT score with our intensive preparation course, featuring practice tests and expert strategies." },
+    { title: "Qudrat Exam Preparation", category: "Local Exams", language: "Arabic", priceKWD: 12, description: "Achieve your best score on the Qudrat exam with our focused preparation materials and mock tests." },
+    { title: "IELTS / TOEFL Preparation", category: "Language Tests", language: "English", priceKWD: 20, description: "Reach your target score with our comprehensive IELTS and TOEFL preparation courses." },
+    { title: "OET Course for Healthcare Professionals", category: "Medical English", language: "English", priceKWD: 28, description: "Specialized English training for doctors, nurses, and other healthcare professionals preparing for the OET." },
+    { title: "French Language Course", category: "Languages", language: "French", priceKWD: 15, description: "Learn the language of love and diplomacy. Our French course takes you from beginner to conversational." },
+    { title: "German Language Course", category: "Languages", language: "German", priceKWD: 15, description: "Start your journey to learning German with our structured course focusing on practical communication." }
+];
+
 
 export default function TeacherDashboardPage() {
   const { user, loading: authLoading } = useAuth();
@@ -65,6 +82,32 @@ export default function TeacherDashboardPage() {
       router.push("/dashboard");
       return;
     }
+
+    const seedDatabase = async () => {
+        const productsRef = collection(db, "products");
+        const q = query(productsRef, limit(1));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+            console.log("Product collection is empty. Seeding database...");
+            toast({ title: "Setting up store...", description: "Adding initial products to the database." });
+            const batch = writeBatch(db);
+            seedProducts.forEach(product => {
+                const docRef = doc(productsRef);
+                batch.set(docRef, {
+                    ...product,
+                    creatorId: user.uid,
+                    creatorName: user.displayName || "EduZone Admin",
+                    imageUrl: `https://placehold.co/600x400.png?text=${product.category.replace(' ', '+')}`,
+                    createdAt: serverTimestamp(),
+                });
+            });
+            await batch.commit();
+            console.log("Database seeded successfully.");
+        }
+    };
+    seedDatabase();
+
 
     setLoading(true);
     const classroomQuery = query(
@@ -347,7 +390,7 @@ export default function TeacherDashboardPage() {
                               <TableRow key={product.id}>
                                 <TableCell className="font-medium">{product.title}</TableCell>
                                 <TableCell className="hidden sm:table-cell"><Badge variant="outline">{product.category}</Badge></TableCell>
-                                <TableCell className="hidden sm:table-cell text-center">{product.priceKWD.toFixed(2)} KWD</TableCell>
+                                <TableCell className="hidden sm:table-cell text-center">{(product.priceKWD || 0).toFixed(2)} KWD</TableCell>
                                 <TableCell className="text-right">
                                     <Button variant="ghost" size="icon" onClick={() => handleDeleteProductClick(product)} title="Delete Product" className="ml-2">
                                         <Trash2 className="h-4 w-4 text-destructive" />
