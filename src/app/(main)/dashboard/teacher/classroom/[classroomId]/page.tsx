@@ -105,12 +105,12 @@ export default function TeacherClassroomPage() {
   const [studentToRemove, setStudentToRemove] = useState<EnrolledStudent | null>(null);
 
   const announcementForm = useForm<z.infer<typeof announcementSchema>>({ resolver: zodResolver(announcementSchema), defaultValues: { content: "" } });
-  const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema) });
-  const materialForm = useForm<z.infer<typeof materialSchema>>({ resolver: zodResolver(materialSchema) });
+  const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema), defaultValues: { title: "", description: "" } });
+  const materialForm = useForm<z.infer<typeof materialSchema>>({ resolver: zodResolver(materialSchema), defaultValues: { title: "", description: "", link: "" } });
   const quizForm = useForm<z.infer<typeof quizSchema>>({ resolver: zodResolver(quizSchema), defaultValues: { title: "", description: "", questions: [] }});
   const { fields: quizQuestions, append: appendQuizQuestion, remove: removeQuizQuestion } = useFieldArray({ control: quizForm.control, name: "questions" });
   
-  const editClassroomForm = useForm<z.infer<typeof editClassroomSchema>>({ resolver: zodResolver(editClassroomSchema) });
+  const editClassroomForm = useForm<z.infer<typeof editClassroomSchema>>({ resolver: zodResolver(editClassroomSchema), defaultValues: { title: "", description: "", subject: "" } });
   const addStudentForm = useForm<z.infer<typeof addStudentSchema>>({ resolver: zodResolver(addStudentSchema), defaultValues: { email: "" } });
 
   const simpleCreate = (collectionName: string) => async (data: any) => {
@@ -150,6 +150,13 @@ export default function TeacherClassroomPage() {
   const handleDeleteMaterial = simpleDelete('materials');
   const handleCreateQuiz = simpleCreate('quizzes');
   const handleDeleteQuiz = simpleDelete('quizzes');
+
+  const onAnnouncementSubmit = async (values: z.infer<typeof announcementSchema>) => {
+    const success = await handleCreateAnnouncement(values);
+    if(success) {
+      announcementForm.reset();
+    }
+  }
 
   const onAssignmentSubmit = async (values: z.infer<typeof assignmentSchema>) => {
     const success = await handleCreateAssignment(values);
@@ -388,7 +395,7 @@ export default function TeacherClassroomPage() {
               </CardHeader>
               <CardContent>
                 <Form {...announcementForm}>
-                  <form onSubmit={announcementForm.handleSubmit(handleCreateAnnouncement)} className="space-y-4">
+                  <form onSubmit={announcementForm.handleSubmit(onAnnouncementSubmit)} className="space-y-4">
                     <FormField control={announcementForm.control} name="content" render={({ field }) => (
                       <FormItem>
                         <FormControl>
@@ -535,7 +542,7 @@ export default function TeacherClassroomPage() {
                                                   <FormField control={quizForm.control} name={`questions.${index}.correctAnswer`} render={({ field }) => (
                                                       <FormItem>
                                                           <FormLabel>Correct Answer</FormLabel>
-                                                          <Select onValueChange={field.onChange} defaultValue={String(field.value)}>
+                                                          <Select onValueChange={field.onChange} value={String(field.value)}>
                                                               <FormControl><SelectTrigger><SelectValue placeholder="Select correct option" /></SelectTrigger></FormControl>
                                                               <SelectContent>
                                                                   <SelectItem value="0">Option 1</SelectItem>
