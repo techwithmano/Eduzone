@@ -1,3 +1,4 @@
+
 import Link from "next/link";
 import { Twitter, Github, Linkedin } from "lucide-react";
 import { Icons } from "@/components/icons";
@@ -6,8 +7,8 @@ export function Footer() {
   return (
     <footer className="border-t bg-secondary/50">
       <div className="container py-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-          <div>
+        <div className="grid grid-cols-1 gap-8 text-center sm:grid-cols-2 sm:text-left lg:grid-cols-4">
+          <div className="flex flex-col items-center sm:items-start">
             <Link href="/" className="flex items-center space-x-2 mb-4">
                 <Icons.logo className="h-6 w-6 text-primary" />
                 <span className="font-bold">EduZone</span>
@@ -34,7 +35,7 @@ export function Footer() {
           </div>
           <div>
             <h4 className="font-semibold mb-3">Follow Us</h4>
-            <div className="flex space-x-4">
+            <div className="flex space-x-4 justify-center sm:justify-start">
               <Link href="#" aria-label="Twitter">
                 <Twitter className="h-5 w-5 text-muted-foreground hover:text-foreground" />
               </Link>

@@ -335,7 +335,7 @@ export default function TeacherClassroomPage() {
         </div>
 
         <Tabs defaultValue="announcements" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 mb-6">
             <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
             <TabsTrigger value="assignments"><FileText className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
             <TabsTrigger value="students"><Users className="mr-2 h-4 w-4" />Students</TabsTrigger>
@@ -386,7 +386,7 @@ export default function TeacherClassroomPage() {
           <TabsContent value="assignments">
             <Card>
               <CardHeader>
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                   <div>
                     <CardTitle>Assignments</CardTitle>
                     <CardDescription>Manage homework, projects, and other assignments.</CardDescription>
@@ -452,7 +452,7 @@ export default function TeacherClassroomPage() {
 
           {/* Students Tab */}
           <TabsContent value="students">
-             <div className="grid lg:grid-cols-3 gap-8 items-start">
+             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                 <div className="lg:col-span-1">
                     <Card>
                         <CardHeader>
@@ -493,7 +493,7 @@ export default function TeacherClassroomPage() {
                                         <TableHeader>
                                             <TableRow>
                                                 <TableHead>Name</TableHead>
-                                                <TableHead>Email</TableHead>
+                                                <TableHead className="hidden sm:table-cell">Email</TableHead>
                                                 <TableHead className="text-right">Actions</TableHead>
                                             </TableRow>
                                         </TableHeader>
@@ -501,7 +501,7 @@ export default function TeacherClassroomPage() {
                                             {enrolledStudents.map((student) => (
                                                 <TableRow key={student.id}>
                                                     <TableCell className="font-medium">{student.displayName}</TableCell>
-                                                    <TableCell>{student.email}</TableCell>
+                                                    <TableCell className="hidden sm:table-cell">{student.email}</TableCell>
                                                     <TableCell className="text-right">
                                                         <Button variant="ghost" size="icon" onClick={() => handleRemoveClick(student)} title="Remove Student">
                                                             <Trash2 className="h-4 w-4 text-destructive" />
