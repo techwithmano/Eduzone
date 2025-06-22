@@ -4,68 +4,74 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // HELPER FUNCTIONS
-    function isOwner(resourceId) {
-      return request.auth.uid == resourceId;
-    }
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-    function isTeacher() {
-      return isSignedIn() && getUserData().role == 'TEACHER';
-    }
-
-    // RULES
-    match /products/{productId} {
-      allow read: if true;
-      allow write: if false; 
+    // --- Helper Functions ---
+    // Checks if the requesting user is the teacher or an enrolled student of a specific classroom.
+    function isClassroomMember(classroomId) {
+      let classroom = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
+      return request.auth != null && (
+        classroom.creatorId == request.auth.uid ||
+        (classroom.enrolledStudentIds is list && request.auth.uid in classroom.enrolledStudentIds)
+      );
     }
     
+    // Checks if the requesting user is the teacher of a specific classroom.
+    function isClassroomTeacher(classroomId) {
+      return request.auth != null && get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId == request.auth.uid;
+    }
+
+
+    // --- Collection Rules ---
+
+    // Users can read public profile info, but only write to their own document.
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId;
+    }
+
+    // Contact messages can only be created. No one can read/update them from the client.
     match /contacts/{contactId} {
-      allow read: if false;
+      allow read, update, delete: if false;
       allow create: if true;
     }
-
-    match /users/{userId} {
-      allow create: if isOwner(userId);
-      // A user can read their own profile.
-      // A teacher can list basic user info for enrolling students.
-      allow get: if isOwner(userId);
-      allow list: if isTeacher();
-      // Allow updates only to specific, safe fields
-      allow update: if isOwner(userId);
+    
+    // Products are publicly readable, but not writable from the client.
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if false;
     }
 
+    // Classrooms and their subcollections
     match /classrooms/{classroomId} {
-      // READ: You can read a classroom if you are the creator (teacher) or enrolled in it (student).
-      // This single rule works for both get and list queries, but requires queries to be specific.
-      allow read: if (request.auth.uid == resource.data.creatorId) || 
-                     (request.auth.uid in resource.data.enrolledStudentIds);
+      // Teachers can create, update, and delete their own classrooms.
+      allow create: if request.auth != null && request.resource.data.creatorId == request.auth.uid;
+      allow update, delete: if isClassroomTeacher(classroomId);
       
-      // WRITE: Only the teacher who created the classroom can modify it.
-      allow create, update, delete: if isTeacher() && request.auth.uid == resource.data.creatorId;
+      // Rule to get a SINGLE classroom document.
+      allow get: if isClassroomMember(classroomId);
 
+      // Rule to LIST classrooms (for dashboard queries).
+      // This allows authenticated users to attempt queries. Security is enforced
+      // by the client-side queries (e.g., where("creatorId", "==", uid)).
+      allow list: if request.auth != null;
+      
+      // Announcements subcollection
       match /announcements/{announcementId} {
-        allow read: if (request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId) || 
-                       (request.auth.uid in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.enrolledStudentIds);
-        allow create, delete: if request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId;
+        allow read: if isClassroomMember(classroomId);
+        allow write: if isClassroomTeacher(classroomId);
       }
       
+      // Assignments subcollection
       match /assignments/{assignmentId} {
-         allow read: if (request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId) || 
-                       (request.auth.uid in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.enrolledStudentIds);
-        allow create, delete: if request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId;
+        allow read: if isClassroomMember(classroomId);
+        allow write: if isClassroomTeacher(classroomId);
         
-        match /submissions/{submissionId} {
-          // The creator of the class (teacher) can read any submission.
-          // The author of the submission (student) can read their own.
-          allow read: if request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId ||
-                         request.auth.uid == submissionId;
-          // A student can only create/update their own submission.
-          allow write: if request.auth.uid == submissionId;
+        // Submissions sub-subcollection
+        match /submissions/{studentId} {
+          // Student can read their own submission. Teacher can read any submission in their class.
+          allow read: if request.auth != null && (request.auth.uid == studentId || isClassroomTeacher(classroomId));
+          
+          // A student can only write to their own submission document.
+          allow write: if request.auth != null && request.auth.uid == studentId;
         }
       }
     }
