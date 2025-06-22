@@ -89,7 +89,6 @@ export default function AdminDashboardPage() {
         const snapshot = await getDocs(q);
 
         if (snapshot.empty) {
-            console.log("Product collection is empty. Seeding database...");
             toast({ title: "Setting up store...", description: "Adding initial products to the database." });
             const batch = writeBatch(db);
             seedProducts.forEach(product => {
@@ -103,7 +102,6 @@ export default function AdminDashboardPage() {
                 });
             });
             await batch.commit();
-            console.log("Database seeded successfully.");
         }
     };
     seedDatabase();
@@ -126,7 +124,6 @@ export default function AdminDashboardPage() {
         setClassrooms(userClassrooms);
         setLoading(false);
     }, (error) => {
-        console.error("Error fetching user classrooms: ", error);
         toast({ variant: "destructive", title: "Error fetching classrooms" });
         setLoading(false);
     });
@@ -135,7 +132,6 @@ export default function AdminDashboardPage() {
         const userProducts = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
         setProducts(userProducts);
     }, (error) => {
-        console.error("Error fetching user products: ", error);
         toast({ variant: "destructive", title: "Error fetching products" });
     });
 
@@ -170,7 +166,6 @@ export default function AdminDashboardPage() {
         await batch.commit();
         toast({ title: "Classroom Deleted" });
     } catch (error) {
-        console.error("Error deleting classroom: ", error);
         toast({ variant: "destructive", title: "Deletion Failed" });
     } finally {
         setIsClassroomAlertOpen(false);
@@ -194,7 +189,6 @@ export default function AdminDashboardPage() {
       productForm.reset();
       setIsProductDialogOpen(false);
     } catch (error) {
-      console.error("Error creating product:", error);
       toast({ variant: "destructive", title: "Error", description: "Failed to create product." });
     } finally {
       setIsSubmitting(false);
@@ -212,7 +206,6 @@ export default function AdminDashboardPage() {
       await deleteDoc(doc(db, "products", productToDelete.id));
       toast({ title: "Product Deleted", description: `"${productToDelete.title}" has been removed from the store.` });
     } catch (error) {
-      console.error("Error deleting product:", error);
       toast({ variant: "destructive", title: "Deletion Failed" });
     } finally {
       setIsProductAlertOpen(false);

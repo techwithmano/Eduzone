@@ -38,7 +38,6 @@ export default function StudentDashboardPage() {
         setClassrooms(fetchedClassrooms);
         setLoading(false);
     }, (error) => {
-        console.error("Error fetching enrolled classrooms: ", error);
         setLoading(false);
     });
 

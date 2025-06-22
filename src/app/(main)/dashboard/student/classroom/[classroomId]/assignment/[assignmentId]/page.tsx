@@ -63,7 +63,6 @@ export default function StudentAssignmentPage() {
                 router.push(`/dashboard/student/classroom/${classroomId}`);
             }
         } catch (error) {
-            console.error("Error fetching assignment:", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to load assignment data.' });
         } finally {
             setLoading(false);
@@ -89,7 +88,6 @@ export default function StudentAssignmentPage() {
             setSubmission(null);
         }
     }, (error) => {
-        console.error("Error fetching submission:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not load submission status.' });
     });
 
@@ -118,7 +116,6 @@ export default function StudentAssignmentPage() {
         
         toast({ title: 'Success!', description: `Your work for "${assignment.title}" has been submitted.` });
     } catch (error) {
-        console.error("Error submitting work:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit your work.' });
     } finally {
         setIsSubmitting(false);

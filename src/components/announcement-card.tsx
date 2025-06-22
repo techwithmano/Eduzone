@@ -37,8 +37,8 @@ export function AnnouncementCard({ announcement, onDelete }: AnnouncementCardPro
             {onDelete && (
                  <AlertDialog>
                     <AlertDialogTrigger asChild>
-                         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
+                         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                            <Trash2 className="h-4 w-4 text-destructive" />
                             <span className="sr-only">Delete Announcement</span>
                          </Button>
                     </AlertDialogTrigger>
@@ -51,7 +51,7 @@ export function AnnouncementCard({ announcement, onDelete }: AnnouncementCardPro
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={onDelete}>Delete</AlertDialogAction>
+                        <AlertDialogAction onClick={onDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>

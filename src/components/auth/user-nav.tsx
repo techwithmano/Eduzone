@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LogOut, LayoutDashboard } from "lucide-react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 export function UserNav() {
   const { user } = useAuth();
@@ -73,7 +74,7 @@ export function UserNav() {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSignOut}>
+        <DropdownMenuItem onClick={handleSignOut} className={cn("text-destructive", "focus:bg-destructive/10 focus:text-destructive")}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
         </DropdownMenuItem>

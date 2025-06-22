@@ -58,17 +58,14 @@ export default function StudentClassroomPage() {
           if (user.enrolledClassroomIds?.includes(classroomDoc.id)) {
             setClassroom({ id: classroomDoc.id, ...classroomData });
           } else {
-            console.error("Access denied: student not enrolled in this classroom.");
             toast({ variant: 'destructive', title: 'Access Denied', description: 'You are not enrolled in this classroom.' });
             router.push('/dashboard/student');
           }
         } else {
-          console.error("Classroom not found.");
           toast({ variant: 'destructive', title: 'Error', description: 'Classroom not found.' });
           router.push('/dashboard/student');
         }
       } catch (error) {
-        console.error("Error fetching classroom:", error);
       } finally {
         setLoading(false);
       }
@@ -94,7 +91,6 @@ export default function StudentClassroomPage() {
             const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setter(items as any);
         }, (err) => {
-            console.error(`Error fetching ${collectionName}:`, err);
         });
         unsubscribers.push(unsubscribe);
     });

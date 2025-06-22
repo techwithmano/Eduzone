@@ -128,7 +128,6 @@ export default function AdminClassroomPage() {
       toast({ title: `${collectionName.slice(0, -1)} created!` });
       return true;
     } catch (error) {
-      console.error(`Error creating ${collectionName}:`, error);
       toast({ variant: "destructive", title: "Error", description: `Failed to create ${collectionName}.` });
       return false;
     } finally {
@@ -141,7 +140,6 @@ export default function AdminClassroomPage() {
         await deleteDoc(doc(db, `classrooms/${classroomId}/${collectionName}`, docId));
         toast({ title: `${collectionName.slice(0,-1)} deleted.` });
     } catch (error) {
-        console.error(`Error deleting ${collectionName}:`, error);
         toast({ variant: "destructive", title: "Error", description: `Failed to delete.` });
     }
   };
@@ -308,7 +306,6 @@ export default function AdminClassroomPage() {
                 router.push('/dashboard/admin');
             }
         } catch (error) {
-            console.error("Error fetching classroom: ", error);
             router.push('/dashboard/admin');
         } finally {
             setLoading(false);

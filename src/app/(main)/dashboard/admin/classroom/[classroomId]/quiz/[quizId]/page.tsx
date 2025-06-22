@@ -61,7 +61,6 @@ export default function AdminQuizResultsPage() {
         setSubmissions(fetchedSubmissions);
         setLoading(false);
     }, (error) => {
-        console.error("Error fetching submissions:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch submissions.' });
         setLoading(false);
     });

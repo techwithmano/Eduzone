@@ -38,7 +38,6 @@ export default function ProductPage() {
                 if (productDoc.exists()) {
                     setProduct({ id: productDoc.id, ...productDoc.data() } as Product);
                 } else {
-                    console.error("No such document!");
                     toast({
                         variant: "destructive",
                         title: "Product not found",
@@ -47,7 +46,6 @@ export default function ProductPage() {
                     router.push('/store');
                 }
             } catch (error) {
-                console.error("Error fetching product:", error);
                  toast({
                     variant: "destructive",
                     title: "Error",

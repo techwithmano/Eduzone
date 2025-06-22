@@ -46,7 +46,6 @@ export default function TeacherDashboardPage() {
         setClassrooms(assignedClassrooms);
         setLoading(false);
     }, (error) => {
-        console.error("Error fetching assigned classrooms: ", error);
         toast({ variant: "destructive", title: "Error fetching classrooms" });
         setLoading(false);
     });

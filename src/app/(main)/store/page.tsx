@@ -26,7 +26,6 @@ export default function StorePage() {
       setProducts(fetchedProducts);
       setLoading(false);
     }, (error) => {
-      console.error("Error fetching products: ", error);
       setLoading(false);
     });
     return () => unsubscribe();

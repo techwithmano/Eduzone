@@ -66,7 +66,6 @@ export default function AdminAssignmentPage() {
                 router.push(`/dashboard/admin/classroom/${classroomId}`);
             }
         } catch (error) {
-            console.error("Error fetching assignment:", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to load assignment data.' });
         }
     };
@@ -79,7 +78,6 @@ export default function AdminAssignmentPage() {
           const fetchedSubmissions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Submission));
           setSubmissions(fetchedSubmissions);
         }, (error) => {
-            console.error("Error fetching submissions:", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch submissions.' });
         });
         setLoading(false);
