@@ -29,7 +29,7 @@ export function ProductCard({ item }: ProductCardProps) {
       <CardContent className="p-4 flex-1 flex flex-col">
         <div className="flex justify-between items-center mb-2">
           <Badge variant="secondary">{item.category}</Badge>
-          <p className="font-semibold text-sm">{item.priceKWD.toFixed(2)} KWD</p>
+          <p className="font-semibold text-sm">{(item.priceKWD || 0).toFixed(2)} KWD</p>
         </div>
         <CardTitle className="text-lg font-semibold mb-2 line-clamp-2">{item.title}</CardTitle>
         <CardDescription className="flex-1 line-clamp-3 text-xs">{item.description}</CardDescription>
