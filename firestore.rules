@@ -1,104 +1,122 @@
 
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // =================================
-    // Helper Functions
-    // =================================
     function isAuth() {
       return request.auth != null;
+    }
+    
+    function userOwnsDoc(docId) {
+      return request.auth.uid == docId;
     }
 
     function getUserData(userId) {
       return get(/databases/$(database)/documents/users/$(userId)).data;
     }
 
-    function isTeacher() {
-      // Check role exists and is 'TEACHER'
+    // More robust role check
+    function isRole(role) {
       let userData = getUserData(request.auth.uid);
-      return isAuth() && 'role' in userData && userData.role == 'TEACHER';
+      return isAuth() && 'role' in userData && userData.role == role;
+    }
+    
+    function isAdmin() {
+      return isRole('ADMIN');
+    }
+
+    function isTeacher() {
+      return isRole('TEACHER');
     }
     
     function isStudent() {
-      // Check role exists and is 'STUDENT'
-      let userData = getUserData(request.auth.uid);
-      return isAuth() && 'role' in userData && userData.role == 'STUDENT';
+      return isRole('STUDENT');
     }
     
-    function isClassroomCreator(classroomId) {
-      // Check creatorId exists and matches the authenticated user
-      let classroomDoc = get(/databases/$(database)/documents/classrooms/$(classroomId));
-      return isTeacher() &&
-             'data' in classroomDoc && // ensure doc exists
-             'creatorId' in classroomDoc.data && 
-             classroomDoc.data.creatorId == request.auth.uid;
-    }
-
+    // Corrected helper to check if a user is enrolled in a specific classroom
     function isEnrolled(classroomId) {
       let userData = getUserData(request.auth.uid);
-      // Check enrolledClassroomIds exists, is a list, and contains the classroomId
-      return isStudent() &&
+      return isAuth() && 
              'enrolledClassroomIds' in userData &&
-             userData.enrolledClassroomIds is list &&
-             classroomId in userData.enrolledClassroomIds;
+             userData.enrolledClassroomIds.hasAny([classroomId]);
     }
-    
-    // =================================
-    // Collections
-    // =================================
+
+    // Corrected helper to check if a user is an assigned teacher for a specific classroom
+    function isAssignedTeacher(classroomId) {
+      let classroomData = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
+      return isAuth() && 
+             'teacherIds' in classroomData &&
+             classroomData.teacherIds.hasAny([request.auth.uid]);
+    }
+
+    // Helper to check if a user is the creator of a classroom
+    function isCreator(classroomId) {
+        let classroomData = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
+        return isAuth() && request.auth.uid == classroomData.creatorId;
+    }
+
     match /users/{userId} {
-      allow get: if isAuth() && request.auth.uid == userId;
-      allow create: if isAuth() && request.auth.uid == userId && !exists(/databases/$(database)/documents/users/$(userId));
-      allow list: if isTeacher(); // For enrolling students by email
-      allow update: if (isTeacher() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['enrolledClassroomIds']))
-                    || (isAuth() && request.auth.uid == userId);
+      allow read: if isAuth();
+      allow write: if userOwnsDoc(userId) || isAdmin();
     }
     
-    match /classrooms/{classroomId} {
-      allow create: if isTeacher() && request.resource.data.creatorId == request.auth.uid;
-      allow read, update, delete: if isClassroomCreator(classroomId);
-      allow get: if isEnrolled(classroomId);
-      allow list: if isAuth(); // Queries are filtered client-side
-
-      match /announcements/{announcementId} {
-        allow read: if isClassroomCreator(classroomId) || isEnrolled(classroomId);
-        allow create, delete: if isClassroomCreator(classroomId);
-      }
-
-      match /assignments/{assignmentId} {
-        allow read: if isClassroomCreator(classroomId) || isEnrolled(classroomId);
-        allow create, delete: if isClassroomCreator(classroomId);
-
-        match /submissions/{submissionId} {
-          allow get, write: if isEnrolled(classroomId) && submissionId == request.auth.uid;
-          allow list, get: if isClassroomCreator(classroomId);
-        }
-      }
-      
-      match /materials/{materialId} {
-        allow read: if isClassroomCreator(classroomId) || isEnrolled(classroomId);
-        allow create, delete: if isClassroomCreator(classroomId);
-      }
-      
-      match /quizzes/{quizId} {
-        allow read: if isClassroomCreator(classroomId) || isEnrolled(classroomId);
-        allow create, delete: if isClassroomCreator(classroomId);
-        
-        match /submissions/{submissionId} {
-          allow read, write: if isEnrolled(classroomId) && submissionId == request.auth.uid;
-          allow list, get: if isClassroomCreator(classroomId);
-        }
-      }
-    }
-
     match /contacts/{contactId} {
       allow create: if true;
     }
     
     match /products/{productId} {
-        allow read, list: if true;
+        allow read: if true;
+        allow create, update, delete: if isAdmin();
+    }
+
+    match /classrooms/{classroomId} {
+      // Any authorized user who is the creator, an assigned teacher, or an enrolled student can read.
+      allow list: if isAuth();
+      allow read: if isAuth() && (isCreator(classroomId) || isAssignedTeacher(classroomId) || isEnrolled(classroomId));
+      
+      // Only Admins can create classrooms.
+      allow create: if isAdmin();
+
+      // Only the creator (Admin) or an assigned Teacher can update.
+      allow update: if isAuth() && (isCreator(classroomId) || isAssignedTeacher(classroomId));
+
+      // Only the creator (Admin) can delete.
+      allow delete: if isCreator(classroomId);
+
+      // Subcollections
+      match /announcements/{announcementId} {
+        allow read: if isAuth() && (isCreator(classroomId) || isAssignedTeacher(classroomId) || isEnrolled(classroomId));
+        allow create, update, delete: if isAuth() && (isCreator(classroomId) || isAssignedTeacher(classroomId));
+      }
+      
+      match /materials/{materialId} {
+        allow read: if isAuth() && (isCreator(classroomId) || isAssignedTeacher(classroomId) || isEnrolled(classroomId));
+        allow create, update, delete: if isAuth() && (isCreator(classroomId) || isAssignedTeacher(classroomId));
+      }
+
+      match /assignments/{assignmentId} {
+        allow read: if isAuth() && (isCreator(classroomId) || isAssignedTeacher(classroomId) || isEnrolled(classroomId));
+        allow create, update, delete: if isAuth() && (isCreator(classroomId) || isAssignedTeacher(classroomId));
+
+        match /submissions/{submissionId} {
+          allow read: if isAuth() && (isCreator(classroomId) || isAssignedTeacher(classroomId));
+          // studentId on submission must match their own uid
+          allow write: if isAuth() && isEnrolled(classroomId) && request.resource.data.studentId == request.auth.uid;
+        }
+      }
+      
+      match /quizzes/{quizId} {
+        allow read: if isAuth() && (isCreator(classroomId) || isAssignedTeacher(classroomId) || isEnrolled(classroomId));
+        allow create, update, delete: if isAuth() && (isCreator(classroomId) || isAssignedTeacher(classroomId));
+
+        match /submissions/{submissionId} {
+          // Admins/Teachers can read any submission. Students can read their own.
+          allow read: if isAuth() && (isCreator(classroomId) || isAssignedTeacher(classroomId) || (userOwnsDoc(submissionId) && isEnrolled(classroomId)));
+          
+          // Enrolled students can create/update their own submission.
+          allow create, update: if isAuth() && isEnrolled(classroomId) && userOwnsDoc(submissionId);
+        }
+      }
     }
   }
 }
