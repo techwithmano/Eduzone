@@ -1,76 +1,84 @@
 
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // UTILITY FUNCTIONS
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
 
-    function getUserRole(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data.role;
-    }
-
+    // Helper function to check if a user is a teacher
     function isTeacher(userId) {
-      return getUserRole(userId) == 'TEACHER';
+      return get(/databases/$(database)/documents/users/$(userId)).data.role == 'TEACHER';
     }
 
-    function isClassroomOwner(classroomId) {
-      return get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId == request.auth.uid;
+    // Helper function to check if a user is the creator of a classroom
+    function isClassroomCreator(classroomId, userId) {
+      return get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId == userId;
     }
 
-    function isEnrolled(classroomId) {
-      // Check if the user's ID is in the classroom's list of enrolled students.
-      return request.auth.uid in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.enrolledStudentIds;
+    // Helper function to check if a student is enrolled in a classroom
+    function isEnrolled(classroomId, userId) {
+      return userId in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.enrolledStudentIds;
     }
 
-    // PUBLIC COLLECTIONS
-    match /contacts/{documentId} {
-      allow create: if true;
-      allow read, update, delete: if request.auth != null && isTeacher(request.auth.uid);
+    // USERS
+    match /users/{userId} {
+      // A user can read and update their own profile
+      allow get, update: if request.auth.uid == userId;
+      // A teacher can search the list of users (to enroll them)
+      allow list: if request.auth != null && isTeacher(request.auth.uid);
+      // Anyone can create their own user account
+      allow create: if request.auth.uid == userId;
     }
 
+    // CLASSROOMS
+    match /classrooms/{classroomId} {
+      // Teachers can create classrooms
+      allow create: if request.auth != null && isTeacher(request.auth.uid);
+      
+      // The teacher who created the classroom can update or delete it
+      allow update, delete: if request.auth != null && isClassroomCreator(classroomId, request.auth.uid);
+      
+      // Enrolled students and the teacher creator can view the classroom details
+      allow get: if request.auth != null && (isClassroomCreator(classroomId, request.auth.uid) || isEnrolled(classroomId, request.auth.uid));
+
+      // Logged in users can query the list of classrooms (client-side filters will show them only the ones they're in)
+      allow list: if request.auth != null;
+
+      // SUBCOLLECTIONS
+      
+      // Announcements
+      match /announcements/{announcementId} {
+        // Teacher can create/delete announcements
+        allow create, delete: if request.auth != null && isClassroomCreator(classroomId, request.auth.uid);
+        // Enrolled students and teacher can read announcements
+        allow read: if request.auth != null && (isClassroomCreator(classroomId, request.auth.uid) || isEnrolled(classroomId, request.auth.uid));
+      }
+
+      // Assignments
+      match /assignments/{assignmentId} {
+        // Teacher can create/delete assignments
+        allow create, delete: if request.auth != null && isClassroomCreator(classroomId, request.auth.uid);
+        // Enrolled students and teacher can read assignments
+        allow read: if request.auth != null && (isClassroomCreator(classroomId, request.auth.uid) || isEnrolled(classroomId, request.auth.uid));
+
+        // Submissions for an assignment
+        match /submissions/{studentId} {
+          // An enrolled student can read and write their OWN submission. The document ID must be their own user ID.
+          allow get, create, update: if request.auth != null && request.auth.uid == studentId && isEnrolled(classroomId, request.auth.uid);
+          // The teacher of the classroom can read all submissions for their assignment
+          allow list: if request.auth != null && isClassroomCreator(classroomId, request.auth.uid);
+        }
+      }
+    }
+
+    // PRODUCTS (for the public store)
     match /products/{productId} {
       allow read: if true;
       allow create, update, delete: if request.auth != null && isTeacher(request.auth.uid);
     }
-    
-    // USER PROFILES
-    match /users/{userId} {
-      // Any authenticated user can search for other users (e.g., to enroll them)
-      allow list: if request.auth != null;
-      // Users can only read or create their own profile
-      allow get, create, update: if isOwner(userId);
-    }
-    
-    // CLASSROOMS & SUBCOLLECTIONS
-    match /classrooms/{classroomId} {
-      // Anyone can query the list of classrooms (e.g. student dashboard needs this)
-      allow list: if request.auth != null;
-      // Only an enrolled user or the owner can view a specific classroom's details
-      allow get: if request.auth != null && (isClassroomOwner(classroomId) || isEnrolled(classroomId));
-      
-      // Only teachers can create classrooms
-      allow create: if request.auth != null && isTeacher(request.auth.uid);
-      // Only the classroom owner can update or delete it, or manage enrollments
-      allow update, delete: if request.auth != null && isClassroomOwner(classroomId);
 
-      // Announcements Subcollection
-      match /announcements/{announcementId} {
-        // Enrolled students and the owner can read announcements
-        allow read: if request.auth != null && (isClassroomOwner(classroomId) || isEnrolled(classroomId));
-        // Only the owner can create or delete announcements
-        allow create, delete: if request.auth != null && isClassroomOwner(classroomId);
-      }
-
-      // Assignments Subcollection
-      match /assignments/{assignmentId} {
-        // Enrolled students and the owner can read assignments
-        allow read: if request.auth != null && (isClassroomOwner(classroomId) || isEnrolled(classroomId));
-        // Only the owner can create or delete assignments
-        allow create, delete: if request.auth != null && isClassroomOwner(classroomId);
-      }
+    // CONTACTS (for the contact form)
+    match /contacts/{contactId} {
+      allow create: if true;
     }
   }
 }

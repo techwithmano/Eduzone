@@ -39,9 +39,17 @@ export type Announcement = {
 };
 
 export type Assignment = {
-  id: string;
+  id:string;
   title: string;
-  description: string;
+  description?: string;
   dueDate: Timestamp;
   createdAt: Timestamp;
+};
+
+export type Submission = {
+  id: string; // Document ID is the student's UID
+  studentId: string;
+  studentName: string;
+  content: string;
+  submittedAt: Timestamp;
 };

@@ -67,8 +67,7 @@ export function AssignmentCard({ assignment, classroomId, isTeacher = false, onD
                  </div>
             ) : (
                 <Button asChild variant="secondary" size="sm">
-                    {/* This will eventually link to the specific assignment submission page */}
-                    <Link href="#">
+                    <Link href={`/dashboard/student/classroom/${classroomId}/assignment/${assignment.id}`}>
                         View Assignment
                         <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
