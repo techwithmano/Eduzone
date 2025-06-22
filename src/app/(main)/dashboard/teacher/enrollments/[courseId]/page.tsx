@@ -10,7 +10,7 @@ import { z } from "zod";
 import { collection, doc, getDoc, getDocs, query, where, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 
-import { type Classroom } from "@/components/product-card";
+import { type Classroom } from "@/components/classroom-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +44,7 @@ export default function EnrollmentsPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
+  // The slug is still called `courseId` from the folder name, but it's a classroom ID.
   const classroomId = params.courseId as string;
 
   const [classroom, setClassroom] = useState<Classroom | null>(null);
@@ -73,7 +74,7 @@ export default function EnrollmentsPage() {
         }
         setClassroom({ id: classroomDoc.id, ...classroomDoc.data() } as Classroom);
 
-        // Fetch enrolled students using array-contains query
+        // Fetch enrolled students by querying the users collection
         const studentsQuery = query(collection(db, "users"), where("enrolledCourseIds", "array-contains", classroomId));
         const studentsSnapshot = await getDocs(studentsQuery);
         const fetchedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as EnrolledStudent[];
@@ -115,6 +116,7 @@ export default function EnrollmentsPage() {
         return;
       }
 
+      // Add the classroomId to the student's `enrolledCourseIds` array
       const studentDocRef = doc(db, "users", studentDoc.id);
       await updateDoc(studentDocRef, {
         enrolledCourseIds: arrayUnion(classroomId)
@@ -146,6 +148,7 @@ export default function EnrollmentsPage() {
     if (!studentToRemove) return;
 
     try {
+        // Remove the classroomId from the student's `enrolledCourseIds` array
         const studentDocRef = doc(db, "users", studentToRemove.id);
         await updateDoc(studentDocRef, {
             enrolledCourseIds: arrayRemove(classroomId)

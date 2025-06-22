@@ -2,21 +2,35 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    match /contacts/{documentId} {
-      allow create: if true;
+
+    // Helper function to check if a user is a teacher
+    function isTeacher(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.role == 'TEACHER';
     }
 
-    match /classrooms/{classroomId} {
+    // Rules for user profiles
+    match /users/{userId} {
+      allow read: if request.auth.uid == userId || isTeacher(request.auth.uid);
+      allow create: if request.auth.uid == userId;
+      allow update: if request.auth.uid == userId;
+      allow list: if isTeacher(request.auth.uid);
+    }
+
+    // Rules for products sold in the store
+    match /products/{productId} {
       allow read: if true;
-      allow create, update, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
+      allow create, update, delete: if isTeacher(request.auth.uid);
     }
     
-    match /users/{userId} {
-      allow get: if request.auth.uid == userId;
-      allow list: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
-      allow create: if request.auth.uid == userId;
-      allow update: if request.auth.uid == userId || (request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER');
+    // Rules for classrooms in the LMS
+    match /classrooms/{classroomId} {
+      allow read: if true; // Or more specific rules later
+      allow create, update, delete: if isTeacher(request.auth.uid);
+    }
+
+    // Rules for contact form submissions
+    match /contacts/{documentId} {
+      allow create: if true;
     }
   }
 }

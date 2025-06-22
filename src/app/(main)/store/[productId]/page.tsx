@@ -9,65 +9,65 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { useAuth } from "@/components/providers/auth-provider";
 
-import { type Classroom } from "@/components/product-card";
+import { type Product } from "@/components/product-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, UserPlus } from "lucide-react";
+import { ArrowLeft, ShoppingCart } from "lucide-react";
 
-export default function ClassroomPage() {
+export default function ProductPage() {
     const params = useParams();
     const router = useRouter();
     const { user } = useAuth();
     const { toast } = useToast();
-    const classroomId = params.productId as string;
+    const productId = params.productId as string;
 
-    const [classroom, setClassroom] = useState<Classroom | null>(null);
+    const [product, setProduct] = useState<Product | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!classroomId) return;
+        if (!productId) return;
         
-        const fetchClassroom = async () => {
+        const fetchProduct = async () => {
             setLoading(true);
             try {
-                const classroomDocRef = doc(db, "classrooms", classroomId);
-                const classroomDoc = await getDoc(classroomDocRef);
+                const productDocRef = doc(db, "products", productId);
+                const productDoc = await getDoc(productDocRef);
 
-                if (classroomDoc.exists()) {
-                    setClassroom({ id: classroomDoc.id, ...classroomDoc.data() } as Classroom);
+                if (productDoc.exists()) {
+                    setProduct({ id: productDoc.id, ...productDoc.data() } as Product);
                 } else {
                     console.error("No such document!");
                     toast({
                         variant: "destructive",
-                        title: "Classroom not found",
-                        description: "Redirecting you back to the classroom list.",
+                        title: "Product not found",
+                        description: "Redirecting you back to the store.",
                     });
                     router.push('/store');
                 }
             } catch (error) {
-                console.error("Error fetching classroom:", error);
+                console.error("Error fetching product:", error);
                  toast({
                     variant: "destructive",
                     title: "Error",
-                    description: "Could not fetch classroom details.",
+                    description: "Could not fetch product details.",
                 });
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchClassroom();
-    }, [classroomId, router, toast]);
+        fetchProduct();
+    }, [productId, router, toast]);
 
-    const handleRequestToJoin = () => {
+    const handleBuyNow = () => {
         if (!user) {
             router.push('/auth');
         } else {
             toast({
                 title: "Feature coming soon!",
-                description: "The ability to request to join a class is not yet implemented.",
+                description: "The payment system is not yet implemented.",
             });
         }
     };
@@ -89,15 +89,15 @@ export default function ClassroomPage() {
         );
     }
 
-    if (!classroom) {
+    if (!product) {
         return (
             <div className="container text-center py-20">
-                <h1 className="text-2xl font-bold">Classroom not found</h1>
-                <p className="text-muted-foreground">The classroom you were looking for does not exist.</p>
+                <h1 className="text-2xl font-bold">Product not found</h1>
+                <p className="text-muted-foreground">The product you were looking for does not exist.</p>
                 <Button asChild className="mt-4">
                     <Link href="/store">
                         <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to Browse
+                        Back to Store
                     </Link>
                 </Button>
             </div>
@@ -110,29 +110,29 @@ export default function ClassroomPage() {
                 <Button variant="ghost" asChild className="mb-8">
                     <Link href="/store">
                         <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to Browse Classrooms
+                        Back to Store
                     </Link>
                 </Button>
                 <div className="grid md:grid-cols-2 gap-8 md:gap-12">
                     <div className="relative aspect-video">
                          <Image
-                            src={classroom.imageUrl}
-                            alt={classroom.title}
+                            src={product.imageUrl}
+                            alt={product.title}
                             fill
                             className="object-cover rounded-lg border"
-                            data-ai-hint="classroom"
+                            data-ai-hint="product image"
                         />
                     </div>
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <Badge variant="outline">{classroom.subject}</Badge>
-                            <h1 className="text-3xl md:text-4xl font-bold font-headline">{classroom.title}</h1>
+                            <Badge variant="outline">{product.subject}</Badge>
+                            <h1 className="text-3xl md:text-4xl font-bold font-headline">{product.title}</h1>
                         </div>
-                        <p className="text-muted-foreground text-lg">{classroom.description}</p>
+                        <p className="text-muted-foreground text-lg">{product.description}</p>
                         
-                        <Button size="lg" onClick={handleRequestToJoin}>
-                            <UserPlus className="mr-2 h-5 w-5" />
-                            Request to Join
+                        <Button size="lg" onClick={handleBuyNow}>
+                            <ShoppingCart className="mr-2 h-5 w-5" />
+                            Buy Now
                         </Button>
                     </div>
                 </div>

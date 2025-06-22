@@ -7,25 +7,25 @@ import { db } from "@/lib/firebase/client";
 
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ClassroomCard, type Classroom } from "@/components/product-card";
+import { ProductCard, type Product } from "@/components/product-card";
 import { Search } from "lucide-react";
 import { CourseCardSkeleton } from "@/components/course-card-skeleton";
 
 const subjects = ["All", "Math", "Programming", "History", "Science", "English", "Art", "Music"];
 
 export default function StorePage() {
-  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [subject, setSubject] = useState("All");
 
   useEffect(() => {
-    const fetchClassrooms = async () => {
+    const fetchProducts = async () => {
       setLoading(true);
       try {
-        const classroomsCollection = collection(db, "classrooms");
-        const classroomSnapshot = await getDocs(classroomsCollection);
-        const classroomList = classroomSnapshot.docs.map(doc => {
+        const productsCollection = collection(db, "products");
+        const productSnapshot = await getDocs(productsCollection);
+        const productList = productSnapshot.docs.map(doc => {
           const data = doc.data();
           return {
             id: doc.id,
@@ -34,35 +34,35 @@ export default function StorePage() {
             imageUrl: data.imageUrl,
             subject: data.subject,
           }
-        }) as Classroom[];
-        setClassrooms(classroomList);
+        }) as Product[];
+        setProducts(productList);
       } catch (error) {
-        console.error("Error fetching classrooms: ", error);
+        console.error("Error fetching products: ", error);
         // In a real app, you might want to show a toast notification here
       } finally {
         setLoading(false);
       }
     };
 
-    fetchClassrooms();
+    fetchProducts();
   }, []);
 
-  const filteredClassrooms = useMemo(() => {
-    return classrooms.filter(classroom => {
-      const searchMatch = classroom.title.toLowerCase().includes(searchTerm.toLowerCase()) || classroom.description.toLowerCase().includes(searchTerm.toLowerCase());
-      const subjectMatch = subject === "All" || classroom.subject === subject;
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+      const searchMatch = product.title.toLowerCase().includes(searchTerm.toLowerCase()) || product.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const subjectMatch = subject === "All" || product.subject === subject;
       return searchMatch && subjectMatch;
     });
-  }, [classrooms, searchTerm, subject]);
+  }, [products, searchTerm, subject]);
 
   return (
     <div className="bg-background text-foreground">
       <section className="w-full py-12 md:py-16 bg-secondary">
         <div className="container px-4 md:px-6">
           <div className="text-center space-y-3">
-            <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl font-headline">Browse Classrooms</h1>
+            <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl font-headline">Browse Our Store</h1>
             <p className="max-w-[700px] mx-auto text-muted-foreground md:text-xl">
-              Explore available classrooms and subjects.
+              Find notes, materials, and other educational resources.
             </p>
           </div>
         </div>
@@ -73,7 +73,7 @@ export default function StorePage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
-              placeholder="Search for classrooms..."
+              placeholder="Search for products..."
               className="pl-10"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -98,16 +98,16 @@ export default function StorePage() {
               <CourseCardSkeleton key={i} />
             ))}
            </div>
-        ) : filteredClassrooms.length > 0 ? (
+        ) : filteredProducts.length > 0 ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredClassrooms.map(classroom => (
-              <ClassroomCard key={classroom.id} classroom={classroom} />
+            {filteredProducts.map(product => (
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
         ) : (
           <div className="text-center py-16">
-            <h2 className="text-2xl font-semibold mb-2">No Classrooms Found</h2>
-            <p className="text-muted-foreground">Try adjusting your search or filters. You may need to add classrooms to the database.</p>
+            <h2 className="text-2xl font-semibold mb-2">No Products Found</h2>
+            <p className="text-muted-foreground">Try adjusting your search or filters.</p>
           </div>
         )}
       </div>

@@ -9,7 +9,7 @@ import { db } from "@/lib/firebase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
-import { ClassroomCard, type Classroom } from "@/components/product-card";
+import { ClassroomCard, type Classroom } from "@/components/classroom-card";
 import { CourseCardSkeleton } from "@/components/course-card-skeleton";
 
 export default function StudentDashboardPage() {
