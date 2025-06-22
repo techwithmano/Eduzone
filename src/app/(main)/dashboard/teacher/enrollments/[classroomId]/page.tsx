@@ -90,9 +90,12 @@ export default function EnrollmentsPage() {
   }, [classroomId, router, toast, user]);
 
   useEffect(() => {
-    if (!classroomId) return;
+    if (!classroomId) {
+        router.push('/dashboard/teacher')
+        return;
+    };
     fetchEnrollmentData();
-  }, [classroomId, fetchEnrollmentData]);
+  }, [classroomId, fetchEnrollmentData, router]);
 
   const handleAddStudent = async (values: z.infer<typeof addStudentSchema>) => {
     setSubmitting(true);
@@ -308,4 +311,3 @@ export default function EnrollmentsPage() {
     </>
   );
 }
-

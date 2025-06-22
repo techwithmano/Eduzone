@@ -19,6 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/components/providers/auth-provider";
 
 
 const classroomSchema = z.object({
@@ -35,6 +36,7 @@ export default function EditClassroomPage() {
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
+  const { user } = useAuth();
   const classroomId = params.classroomId as string;
 
   const form = useForm<z.infer<typeof classroomSchema>>({
@@ -47,15 +49,26 @@ export default function EditClassroomPage() {
   });
   
   useEffect(() => {
-    if (!classroomId) return;
+    if (!classroomId) {
+        router.push('/dashboard/teacher');
+        return;
+    };
+    if (!user) return;
 
     const fetchClassroomData = async () => {
+      setLoading(true);
       try {
         const classroomDocRef = doc(db, "classrooms", classroomId);
         const classroomDoc = await getDoc(classroomDocRef);
 
         if (classroomDoc.exists()) {
           const classroomData = classroomDoc.data();
+          // Security check
+          if (classroomData.creatorId !== user.uid) {
+            toast({ variant: "destructive", title: "Access Denied" });
+            router.push("/dashboard/teacher");
+            return;
+          }
           form.reset(classroomData);
         } else {
           toast({ variant: "destructive", title: "Classroom not found" });
@@ -70,7 +83,7 @@ export default function EditClassroomPage() {
     };
     
     fetchClassroomData();
-  }, [classroomId, form, router, toast]);
+  }, [classroomId, form, router, toast, user]);
 
   const onSubmit = async (values: z.infer<typeof classroomSchema>) => {
     setSubmitting(true);
