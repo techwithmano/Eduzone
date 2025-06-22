@@ -16,7 +16,7 @@ import { format } from "date-fns";
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Loader2, Megaphone, FileText, Plus, CalendarIcon } from 'lucide-react';
+import { ArrowLeft, Loader2, Megaphone, FileText, Plus, CalendarIcon, Settings } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -185,10 +185,11 @@ export default function TeacherClassroomPage() {
       </div>
 
       <Tabs defaultValue="announcements" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-6">
+        <TabsList className="grid w-full grid-cols-5 mb-6">
           <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
           <TabsTrigger value="assignments"><FileText className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
           <TabsTrigger value="students" onClick={() => router.push(`/dashboard/teacher/enrollments/${classroomId}`)}>Students</TabsTrigger>
+          <TabsTrigger value="settings" onClick={() => router.push(`/dashboard/teacher/edit/${classroomId}`)}><Settings className="mr-2 h-4 w-4" />Settings</TabsTrigger>
           <TabsTrigger value="quizzes" disabled>Quizzes</TabsTrigger>
         </TabsList>
 
@@ -313,6 +314,11 @@ export default function TeacherClassroomPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Other Tab Stubs for future implementation */}
+        <TabsContent value="students"></TabsContent>
+        <TabsContent value="settings"></TabsContent>
+
       </Tabs>
     </div>
   );

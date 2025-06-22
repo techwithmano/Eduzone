@@ -94,7 +94,7 @@ export default function EditClassroomPage() {
           title: "Classroom Updated!",
           description: "Your classroom has been successfully updated.",
         })
-        router.push("/dashboard/teacher");
+        router.push(`/dashboard/teacher/classroom/${classroomId}`);
     } catch(error) {
         console.error("Error updating classroom: ", error);
         toast({
@@ -142,9 +142,9 @@ export default function EditClassroomPage() {
     <div className="container py-8">
         <div className="max-w-2xl mx-auto">
             <Button variant="ghost" asChild className="mb-4 -ml-4">
-                <Link href="/dashboard/teacher">
+                <Link href={`/dashboard/teacher/classroom/${classroomId}`}>
                     <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to Teacher Dashboard
+                    Back to Classroom
                 </Link>
             </Button>
             <Card>
