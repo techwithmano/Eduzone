@@ -123,16 +123,13 @@ export default function AdminDashboardPage() {
         const userClassrooms = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Classroom[];
         setClassrooms(userClassrooms);
         setLoading(false);
-    }, (error) => {
-        toast({ variant: "destructive", title: "Error fetching classrooms" });
+    }, () => {
         setLoading(false);
     });
 
     const unsubProducts = onSnapshot(productQuery, (querySnapshot) => {
         const userProducts = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
         setProducts(userProducts);
-    }, (error) => {
-        toast({ variant: "destructive", title: "Error fetching products" });
     });
 
     return () => {
@@ -236,7 +233,7 @@ export default function AdminDashboardPage() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={() => setClassroomToDelete(null)}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleDeleteClassroomConfirm} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+          <AlertDialogAction onClick={handleDeleteClassroomConfirm} variant="destructive">Delete</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -251,13 +248,13 @@ export default function AdminDashboardPage() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={() => setProductToDelete(null)}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleDeleteProductConfirm} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+          <AlertDialogAction onClick={handleDeleteProductConfirm} variant="destructive">Delete</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
 
     <div className="container py-8">
-      <div className="space-y-1 mb-6">
+      <div className="space-y-1 mb-8">
           <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl">Admin Dashboard</h1>
           <p className="text-muted-foreground">Manage your classrooms and store products.</p>
       </div>

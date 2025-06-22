@@ -198,7 +198,7 @@ export default function TeacherClassroomPage() {
         </Link>
       </Button>
 
-      <div className="mb-6">
+      <div className="mb-8">
         <Badge variant="secondary" className="mb-2">{classroom.subject}</Badge>
         <h1 className="text-3xl md:text-4xl font-bold font-headline">{classroom.title}</h1>
         <p className="text-muted-foreground mt-1">Admin: {classroom.creatorName}</p>
@@ -295,7 +295,7 @@ export default function TeacherClassroomPage() {
         <TabsContent value="quizzes">
             <Card>
               <CardHeader>
-                <div className="flex justify-between items-center gap-4">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                   <CardTitle>Quizzes</CardTitle>
                   <Dialog open={isQuizDialogOpen} onOpenChange={setIsQuizDialogOpen}>
                     <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />Create Quiz</Button></DialogTrigger>
@@ -344,7 +344,7 @@ export default function TeacherClassroomPage() {
         <TabsContent value="materials">
            <Card>
             <CardHeader>
-              <div className="flex justify-between items-center gap-4">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                 <CardTitle>Course Materials</CardTitle>
                 <Dialog open={isMaterialDialogOpen} onOpenChange={setIsMaterialDialogOpen}>
                   <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />Add Material</Button></DialogTrigger>

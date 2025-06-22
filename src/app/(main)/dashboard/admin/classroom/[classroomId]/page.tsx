@@ -351,13 +351,13 @@ export default function AdminClassroomPage() {
           </Link>
         </Button>
 
-        <div className="mb-6">
+        <div className="mb-8">
           <Badge variant="secondary" className="mb-2">{classroom.subject}</Badge>
           <h1 className="text-3xl md:text-4xl font-bold font-headline">{classroom.title}</h1>
         </div>
 
         <Tabs defaultValue="announcements" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7 mb-6">
+          <TabsList className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 mb-6">
             <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
             <TabsTrigger value="assignments"><FileText className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
             <TabsTrigger value="quizzes"><Notebook className="mr-2 h-4 w-4" />Quizzes</TabsTrigger>
@@ -619,8 +619,8 @@ export default function AdminClassroomPage() {
 
           {/* Students Tab */}
           <TabsContent value="students">
-             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                <div className="lg:col-span-1">
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+                <div className="md:col-span-1">
                     <Card>
                         <CardHeader>
                             <CardTitle>Add Student</CardTitle>
@@ -645,7 +645,7 @@ export default function AdminClassroomPage() {
                         </CardContent>
                     </Card>
                 </div>
-                <div className="lg:col-span-2">
+                <div className="md:col-span-2">
                     <Card>
                         <CardHeader>
                             <CardTitle>Enrolled Students</CardTitle>
@@ -677,8 +677,8 @@ export default function AdminClassroomPage() {
           
           {/* Teachers Tab */}
           <TabsContent value="teachers">
-             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                <div className="lg:col-span-1">
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+                <div className="md:col-span-1">
                     <Card>
                         <CardHeader>
                             <CardTitle>Assign Teacher</CardTitle>
@@ -703,7 +703,7 @@ export default function AdminClassroomPage() {
                         </CardContent>
                     </Card>
                 </div>
-                <div className="lg:col-span-2">
+                <div className="md:col-span-2">
                     <Card>
                         <CardHeader>
                             <CardTitle>Assigned Teachers</CardTitle>
