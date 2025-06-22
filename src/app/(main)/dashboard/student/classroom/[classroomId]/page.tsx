@@ -4,24 +4,29 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, orderBy, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
 
-import { type Classroom } from '@/components/classroom-card';
+import { type Classroom, type Announcement, type Assignment } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Megaphone, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AnnouncementCard } from '@/components/announcement-card';
+import { AssignmentCard } from '@/components/assignment-card';
 
-export default function ClassroomPage() {
+export default function StudentClassroomPage() {
   const params = useParams();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const classroomId = params.classroomId as string;
 
   const [classroom, setClassroom] = useState<Classroom | null>(null);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,7 +49,7 @@ export default function ClassroomPage() {
         if (classroomDoc.exists()) {
           const classroomData = classroomDoc.data() as Omit<Classroom, 'id'>;
           // Security check: ensure student is enrolled
-          if (classroomData.enrolledStudentIds?.includes(user.uid)) {
+          if (user.enrolledClassroomIds?.includes(classroomDoc.id)) {
             setClassroom({ id: classroomDoc.id, ...classroomData });
           } else {
             console.error("Access denied: student not enrolled in this classroom.");
@@ -64,6 +69,30 @@ export default function ClassroomPage() {
     fetchClassroom();
   }, [classroomId, user, authLoading, router]);
 
+   useEffect(() => {
+    if (!classroomId) return;
+    
+    const unsubscribers: Unsubscribe[] = [];
+
+    // Subscribe to announcements
+    const announcementsQuery = query(collection(db, `classrooms/${classroomId}/announcements`), orderBy('createdAt', 'desc'));
+    const announcementsUnsub = onSnapshot(announcementsQuery, (snapshot) => {
+      const fetchedAnnouncements = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement));
+      setAnnouncements(fetchedAnnouncements);
+    });
+    unsubscribers.push(announcementsUnsub);
+
+    // Subscribe to assignments
+    const assignmentsQuery = query(collection(db, `classrooms/${classroomId}/assignments`), orderBy('createdAt', 'desc'));
+    const assignmentsUnsub = onSnapshot(assignmentsQuery, (snapshot) => {
+      const fetchedAssignments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Assignment));
+      setAssignments(fetchedAssignments);
+    });
+    unsubscribers.push(assignmentsUnsub);
+
+    return () => unsubscribers.forEach(unsub => unsub());
+  }, [classroomId]);
+
   if (loading || authLoading) {
     return (
       <div className="container py-8">
@@ -82,7 +111,6 @@ export default function ClassroomPage() {
   }
 
   if (!classroom) {
-    // This case is mostly handled by the redirect, but it's good for safety.
     return (
         <div className="container text-center py-20">
             <h1 className="text-2xl font-bold">Classroom not found or not enrolled.</h1>
@@ -98,7 +126,7 @@ export default function ClassroomPage() {
 
   return (
     <div className="container py-8">
-      <Button variant="ghost" asChild className="mb-6">
+      <Button variant="ghost" asChild className="mb-6 -ml-4">
         <Link href="/dashboard/student">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Dashboard
@@ -111,36 +139,45 @@ export default function ClassroomPage() {
         <p className="text-muted-foreground mt-1">Taught by {classroom.creatorName}</p>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-8">
-        <div className="md:col-span-2 space-y-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Announcements</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-muted-foreground">No announcements yet.</p>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Assignments</CardTitle>
-                </CardHeader>
-                <CardContent>
-                     <p className="text-muted-foreground">No assignments yet.</p>
-                </CardContent>
-            </Card>
-        </div>
-        <div className="md:col-span-1 space-y-6">
-             <Card>
-                <CardHeader>
-                    <CardTitle>Course Materials</CardTitle>
-                </CardHeader>
-                <CardContent>
-                     <p className="text-muted-foreground">No materials uploaded yet.</p>
-                </CardContent>
-            </Card>
-        </div>
-      </div>
+       <Tabs defaultValue="announcements" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
+          <TabsTrigger value="assignments"><FileText className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
+          <TabsTrigger value="quizzes" disabled>Quizzes</TabsTrigger>
+        </TabsList>
+        <TabsContent value="announcements">
+          <Card>
+            <CardHeader>
+              <CardTitle>Announcements</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {announcements.length > 0 ? (
+                announcements.map(announcement => (
+                    <AnnouncementCard key={announcement.id} announcement={announcement} />
+                ))
+              ) : (
+                <p className="text-muted-foreground">No announcements yet.</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="assignments">
+           <Card>
+            <CardHeader>
+              <CardTitle>Assignments</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+               {assignments.length > 0 ? (
+                 assignments.map(assignment => (
+                    <AssignmentCard key={assignment.id} classroomId={classroomId} assignment={assignment} />
+                 ))
+               ) : (
+                <p className="text-muted-foreground">No assignments have been posted yet.</p>
+               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
     </div>
   );

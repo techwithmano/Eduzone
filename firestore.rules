@@ -3,53 +3,74 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // UTILITY FUNCTIONS
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function getUserRole(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.role;
+    }
+
+    function isTeacher(userId) {
+      return getUserRole(userId) == 'TEACHER';
+    }
+
+    function isClassroomOwner(classroomId) {
+      return get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId == request.auth.uid;
+    }
+
+    function isEnrolled(classroomId) {
+      // Check if the user's ID is in the classroom's list of enrolled students.
+      return request.auth.uid in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.enrolledStudentIds;
+    }
+
     // PUBLIC COLLECTIONS
-    // ===================================
     match /contacts/{documentId} {
-      // Anyone can send a message through the contact form
       allow create: if true;
-      allow read, update, delete: if false; // Only backend processes should manage this
+      allow read, update, delete: if request.auth != null && isTeacher(request.auth.uid);
     }
 
     match /products/{productId} {
-      // Anyone can view products in the store
-      allow get, list: if true;
-      // Only teachers can create, update, or delete products
-      allow create, update, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
+      allow read: if true;
+      allow create, update, delete: if request.auth != null && isTeacher(request.auth.uid);
     }
-
-    // USER-SPECIFIC COLLECTIONS
-    // ===================================
+    
+    // USER PROFILES
     match /users/{userId} {
-      // A user can get their own document
-      allow get: if request.auth.uid == userId;
-      // A user can create their own document upon signup
-      allow create: if request.auth.uid == userId;
-      // A teacher can search the list of users (e.g., to find a student by email)
-      allow list: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
-      // No one can update or delete another user's document through the client
-      allow update, delete: if false;
+      // Any authenticated user can search for other users (e.g., to enroll them)
+      allow list: if request.auth != null;
+      // Users can only read or create their own profile
+      allow get, create, update: if isOwner(userId);
     }
-
-    // LMS-SPECIFIC COLLECTIONS
-    // ===================================
+    
+    // CLASSROOMS & SUBCOLLECTIONS
     match /classrooms/{classroomId} {
-        // Allow read if you are the creator OR you are an enrolled student
-        allow get, list: if request.auth != null && (
-                         request.auth.uid == resource.data.creatorId || 
-                         request.auth.uid in resource.data.enrolledStudentIds
-                       );
-        
-        // Only a teacher can create a classroom, and they must set themselves as the creator
-        allow create: if request.auth != null &&
-                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER' &&
-                      request.resource.data.creatorId == request.auth.uid;
-                      
-        // Only the creator can update the classroom (e.g., to change details or enroll students)
-        allow update: if request.auth != null && request.auth.uid == resource.data.creatorId;
+      // Anyone can query the list of classrooms (e.g. student dashboard needs this)
+      allow list: if request.auth != null;
+      // Only an enrolled user or the owner can view a specific classroom's details
+      allow get: if request.auth != null && (isClassroomOwner(classroomId) || isEnrolled(classroomId));
+      
+      // Only teachers can create classrooms
+      allow create: if request.auth != null && isTeacher(request.auth.uid);
+      // Only the classroom owner can update or delete it, or manage enrollments
+      allow update, delete: if request.auth != null && isClassroomOwner(classroomId);
 
-        // Only the creator can delete the classroom
-        allow delete: if request.auth != null && request.auth.uid == resource.data.creatorId;
+      // Announcements Subcollection
+      match /announcements/{announcementId} {
+        // Enrolled students and the owner can read announcements
+        allow read: if request.auth != null && (isClassroomOwner(classroomId) || isEnrolled(classroomId));
+        // Only the owner can create or delete announcements
+        allow create, delete: if request.auth != null && isClassroomOwner(classroomId);
+      }
+
+      // Assignments Subcollection
+      match /assignments/{assignmentId} {
+        // Enrolled students and the owner can read assignments
+        allow read: if request.auth != null && (isClassroomOwner(classroomId) || isEnrolled(classroomId));
+        // Only the owner can create or delete assignments
+        allow create, delete: if request.auth != null && isClassroomOwner(classroomId);
+      }
     }
   }
 }

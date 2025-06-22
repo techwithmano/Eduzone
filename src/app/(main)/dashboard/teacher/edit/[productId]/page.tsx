@@ -35,8 +35,7 @@ export default function EditClassroomPage() {
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
-  // Note: The folder is named `[productId]` but we are treating it as a classroom ID for our LMS.
-  const classroomId = params.productId as string;
+  const classroomId = params.classroomId as string;
 
   const form = useForm<z.infer<typeof classroomSchema>>({
     resolver: zodResolver(classroomSchema),

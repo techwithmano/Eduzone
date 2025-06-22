@@ -7,13 +7,13 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { collection, query, where, getDocs, orderBy, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
-import { type Classroom } from "@/components/classroom-card";
+import { type Classroom } from "@/lib/types";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Loader2, Edit, Trash2, Users } from "lucide-react";
+import { PlusCircle, Loader2, Edit, Trash2, Users, BookOpen } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -151,6 +151,7 @@ export default function TeacherDashboardPage() {
                     <TableRow>
                         <TableHead>Title</TableHead>
                         <TableHead className="hidden sm:table-cell">Subject</TableHead>
+                        <TableHead className="hidden sm:table-cell">Enrolled</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                     </TableHeader>
@@ -159,7 +160,14 @@ export default function TeacherDashboardPage() {
                         <TableRow key={classroom.id}>
                           <TableCell className="font-medium">{classroom.title}</TableCell>
                           <TableCell className="hidden sm:table-cell"><Badge variant="secondary">{classroom.subject}</Badge></TableCell>
+                          <TableCell className="hidden sm:table-cell">{classroom.enrolledStudentIds?.length || 0}</TableCell>
                           <TableCell className="text-right">
+                              <Button variant="ghost" size="icon" asChild title="View Classroom">
+                                <Link href={`/dashboard/teacher/classroom/${classroom.id}`}>
+                                    <BookOpen className="h-4 w-4" />
+                                    <span className="sr-only">View Classroom</span>
+                                </Link>
+                              </Button>
                               <Button variant="ghost" size="icon" asChild title="Manage Students">
                                 <Link href={`/dashboard/teacher/enrollments/${classroom.id}`}>
                                     <Users className="h-4 w-4" />

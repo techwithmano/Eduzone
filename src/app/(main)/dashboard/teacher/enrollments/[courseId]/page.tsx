@@ -7,10 +7,10 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { collection, doc, getDoc, getDocs, query, where, updateDoc, arrayUnion, arrayRemove, documentId } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where, updateDoc, arrayUnion, arrayRemove, documentId, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 
-import { type Classroom } from "@/components/classroom-card";
+import { type Classroom, type UserProfile } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,17 +34,13 @@ const addStudentSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
 });
 
-type EnrolledStudent = {
-  id: string; // This is the user's UID
-  displayName: string;
-  email: string;
-};
+type EnrolledStudent = Pick<UserProfile, 'uid' | 'displayName' | 'email'> & { id: string };
 
 export default function EnrollmentsPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
-  const classroomId = params.courseId as string;
+  const classroomId = params.classroomId as string;
 
   const [classroom, setClassroom] = useState<Classroom | null>(null);
   const [enrolledStudents, setEnrolledStudents] = useState<EnrolledStudent[]>([]);
@@ -58,11 +54,13 @@ export default function EnrollmentsPage() {
   });
 
   const fetchEnrollmentData = useCallback(async () => {
+    if (!classroomId) return;
     setLoading(true);
     try {
       // Fetch classroom details
       const classroomDocRef = doc(db, "classrooms", classroomId);
       const classroomDoc = await getDoc(classroomDocRef);
+
       if (!classroomDoc.exists()) {
         toast({ variant: "destructive", title: "Classroom not found" });
         router.push("/dashboard/teacher");
@@ -121,11 +119,20 @@ export default function EnrollmentsPage() {
         return;
       }
 
-      // Add the student's ID to the classroom's `enrolledStudentIds` array
+      // Use a batch write to update both the classroom and the user document atomically
+      const batch = writeBatch(db);
+
       const classroomDocRef = doc(db, "classrooms", classroomId);
-      await updateDoc(classroomDocRef, {
+      batch.update(classroomDocRef, {
         enrolledStudentIds: arrayUnion(studentDoc.id)
       });
+      
+      const studentDocRef = doc(db, "users", studentDoc.id);
+      batch.update(studentDocRef, {
+        enrolledClassroomIds: arrayUnion(classroomId)
+      });
+      
+      await batch.commit();
       
       await fetchEnrollmentData(); // Refetch data to update the UI
       form.reset();
@@ -147,11 +154,19 @@ export default function EnrollmentsPage() {
     if (!studentToRemove) return;
 
     try {
-        // Remove the student's ID from the classroom's `enrolledStudentIds` array
+        const batch = writeBatch(db);
+
         const classroomDocRef = doc(db, "classrooms", classroomId);
-        await updateDoc(classroomDocRef, {
+        batch.update(classroomDocRef, {
             enrolledStudentIds: arrayRemove(studentToRemove.id)
         });
+
+        const studentDocRef = doc(db, "users", studentToRemove.id);
+        batch.update(studentDocRef, {
+            enrolledClassroomIds: arrayRemove(classroomId)
+        });
+
+        await batch.commit();
 
         setEnrolledStudents(enrolledStudents.filter(s => s.id !== studentToRemove.id));
         toast({

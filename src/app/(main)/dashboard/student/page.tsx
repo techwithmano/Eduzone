@@ -9,8 +9,9 @@ import { db } from "@/lib/firebase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
-import { ClassroomCard, type Classroom } from "@/components/classroom-card";
+import { ClassroomCard } from "@/components/classroom-card";
 import { CourseCardSkeleton } from "@/components/course-card-skeleton";
+import { type Classroom } from "@/lib/types";
 
 export default function StudentDashboardPage() {
   const { user, loading: authLoading } = useAuth();
@@ -30,11 +31,13 @@ export default function StudentDashboardPage() {
     }
 
     const fetchEnrolledClassrooms = async () => {
-      if (!user) return;
+      if (!user?.enrolledClassroomIds || user.enrolledClassroomIds.length === 0) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
-        // Query classrooms where the user's ID is in the enrolledStudentIds array
-        const classroomsQuery = query(collection(db, "classrooms"), where("enrolledStudentIds", "array-contains", user.uid));
+        const classroomsQuery = query(collection(db, "classrooms"), where(documentId(), "in", user.enrolledClassroomIds));
         const classroomsSnapshot = await getDocs(classroomsQuery);
         
         const fetchedClassrooms = classroomsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classroom));
@@ -103,7 +106,7 @@ export default function StudentDashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p>No upcoming assignments.</p>
+            <p className="text-muted-foreground">No upcoming assignments.</p>
           </CardContent>
         </Card>
     </div>

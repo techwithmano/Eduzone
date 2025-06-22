@@ -4,17 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
-export type Classroom = {
-  id: string;
-  title: string;
-  description: string;
-  imageUrl: string;
-  subject: string;
-  creatorId: string;
-  creatorName: string;
-  enrolledStudentIds?: string[];
-};
+import type { Classroom } from "@/lib/types";
 
 interface ClassroomCardProps {
   classroom: Classroom;
