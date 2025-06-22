@@ -35,6 +35,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const announcementSchema = z.object({
   content: z.string().min(10, "Announcement must be at least 10 characters.").max(1000, "Announcement cannot exceed 1000 characters."),
@@ -179,7 +180,7 @@ export default function TeacherClassroomPage() {
       await batch.commit();
       
       setEnrolledStudents(prev => [...prev, { id: studentDoc.id, ...studentData } as EnrolledStudent]);
-      setClassroom(prev => prev ? ({ ...prev, enrolledStudentIds: [...prev.enrolledStudentIds, studentDoc.id]}) : null);
+      setClassroom(prev => prev ? ({ ...prev, enrolledStudentIds: [...(prev.enrolledStudentIds || []), studentDoc.id]}) : null);
       addStudentForm.reset();
       toast({ title: "Student Enrolled!", description: `${studentData.displayName} has been added.`});
 
@@ -248,7 +249,9 @@ export default function TeacherClassroomPage() {
                 const classroomData = { id: classroomDoc.id, ...classroomDoc.data() } as Classroom;
                 setClassroom(classroomData);
                 editClassroomForm.reset(classroomData);
-                await fetchEnrolledStudents(classroomData.enrolledStudentIds);
+                if (classroomData.enrolledStudentIds) {
+                    await fetchEnrolledStudents(classroomData.enrolledStudentIds);
+                }
 
                 // Setup listeners after initial data load
                 const announcementsQuery = query(collection(db, `classrooms/${classroomId}/announcements`), orderBy('createdAt', 'desc'));
