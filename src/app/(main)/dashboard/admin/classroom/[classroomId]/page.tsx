@@ -357,7 +357,7 @@ export default function AdminClassroomPage() {
         </div>
 
         <Tabs defaultValue="announcements" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 mb-6">
+          <TabsList className="mb-6 flex h-auto w-full flex-wrap justify-start gap-1">
             <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
             <TabsTrigger value="assignments"><FileText className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
             <TabsTrigger value="quizzes"><Notebook className="mr-2 h-4 w-4" />Quizzes</TabsTrigger>
