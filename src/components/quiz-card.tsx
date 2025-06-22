@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { useAuth } from "./providers/auth-provider";
 
 interface QuizCardProps {
   quiz: Quiz;
@@ -26,7 +27,18 @@ interface QuizCardProps {
 }
 
 export function QuizCard({ quiz, classroomId, isTeacher = false, onDelete }: QuizCardProps) {
+  const { user } = useAuth();
   
+  const getLinkPath = () => {
+    if (user?.role === 'ADMIN') {
+        return `/dashboard/admin/classroom/${classroomId}/quiz/${quiz.id}`;
+    }
+    if (user?.role === 'TEACHER') {
+        return `/dashboard/teacher/classroom/${classroomId}/quiz/${quiz.id}`;
+    }
+    return `/dashboard/student/classroom/${classroomId}/quiz/${quiz.id}`;
+  }
+
   const cardContent = (
      <div className="flex justify-between items-center p-4 gap-4">
         <div className="flex-1 space-y-1 overflow-hidden">
@@ -37,7 +49,7 @@ export function QuizCard({ quiz, classroomId, isTeacher = false, onDelete }: Qui
           {isTeacher ? (
             <>
               <Button variant="secondary" size="sm" asChild>
-                 <Link href={`/dashboard/teacher/classroom/${classroomId}/quiz/${quiz.id}`}>
+                 <Link href={getLinkPath()}>
                     View Results
                     <ArrowRight className="ml-2 h-4 w-4" />
                  </Link>
@@ -67,7 +79,7 @@ export function QuizCard({ quiz, classroomId, isTeacher = false, onDelete }: Qui
             </>
           ) : (
               <Button asChild variant="secondary" size="sm">
-                  <Link href={`/dashboard/student/classroom/${classroomId}/quiz/${quiz.id}`}>
+                  <Link href={getLinkPath()}>
                       Start Quiz
                       <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>

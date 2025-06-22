@@ -166,7 +166,7 @@ export function AuthForm() {
         <CardHeader>
             <CardTitle>Create an Account</CardTitle>
             <CardDescription>
-                All new accounts are created as Students. Teacher accounts must be enabled separately by an administrator.
+                All new accounts are created as Students. Admin and Teacher accounts must be enabled separately.
             </CardDescription>
         </CardHeader>
         <Form {...signUpForm}>

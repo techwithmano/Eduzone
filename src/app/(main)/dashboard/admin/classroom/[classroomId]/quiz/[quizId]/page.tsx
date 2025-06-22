@@ -9,7 +9,7 @@ import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
 import { format } from "date-fns";
 
-import { type Quiz, type QuizSubmission, type Classroom } from '@/lib/types';
+import { type Quiz, type QuizSubmission } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,7 +17,7 @@ import { ArrowLeft, User, Calendar, Percent, Loader2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
 
-export default function TeacherQuizResultsPage() {
+export default function AdminQuizResultsPage() {
   const params = useParams();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -31,50 +31,42 @@ export default function TeacherQuizResultsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (authLoading || !user || user.role !== 'TEACHER') return;
+    if (authLoading || !user || user.role !== 'ADMIN') return;
 
     if (!classroomId || !quizId) {
-        router.push('/dashboard/teacher');
+        router.push('/dashboard/admin');
         return;
     }
 
-     const checkPermissionsAndFetch = async () => {
-        setLoading(true);
+    const fetchQuiz = async () => {
         try {
-            const classroomDocRef = doc(db, 'classrooms', classroomId);
-            const classroomDoc = await getDoc(classroomDocRef);
-            if (!classroomDoc.exists()) throw new Error('Classroom not found.');
-            
-            const classroomData = classroomDoc.data() as Classroom;
-            if (!classroomData.teacherIds?.includes(user.uid) && classroomData.creatorId !== user.uid) {
-                throw new Error('You are not assigned to this classroom.');
-            }
-
             const quizDocRef = doc(db, `classrooms/${classroomId}/quizzes`, quizId);
             const quizDoc = await getDoc(quizDocRef);
-            if (!quizDoc.exists()) throw new Error('Quiz not found.');
-            
-            setQuiz({ id: quizDoc.id, ...quizDoc.data() } as Quiz);
-
-            const submissionsQuery = query(collection(db, `classrooms/${classroomId}/quizzes/${quizId}/submissions`), orderBy('submittedAt', 'desc'));
-            const unsubscribe = onSnapshot(submissionsQuery, (snapshot) => {
-                setSubmissions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as QuizSubmission)));
-                setLoading(false);
-            });
-            return unsubscribe;
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Error', description: error.message });
-            router.push(`/dashboard/teacher/classroom/${classroomId}`);
-            setLoading(false);
-            return () => {};
+            if (quizDoc.exists()) {
+                 setQuiz({ id: quizDoc.id, ...quizDoc.data() } as Quiz);
+            } else {
+                toast({ variant: 'destructive', title: 'Error', description: 'Quiz not found.' });
+                router.push(`/dashboard/admin/classroom/${classroomId}`);
+            }
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to load quiz data.' });
         }
     };
     
-    const unsubscribePromise = checkPermissionsAndFetch();
+    fetchQuiz();
 
-    return () => {
-        unsubscribePromise.then(unsub => unsub());
-    };
+    const submissionsQuery = query(collection(db, `classrooms/${classroomId}/quizzes/${quizId}/submissions`), orderBy('submittedAt', 'desc'));
+    const unsubscribe = onSnapshot(submissionsQuery, (snapshot) => {
+        const fetchedSubmissions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as QuizSubmission));
+        setSubmissions(fetchedSubmissions);
+        setLoading(false);
+    }, (error) => {
+        console.error("Error fetching submissions:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch submissions.' });
+        setLoading(false);
+    });
+
+    return () => unsubscribe();
 
   }, [classroomId, quizId, user, authLoading, router, toast]);
 
@@ -95,7 +87,7 @@ export default function TeacherQuizResultsPage() {
   return (
     <div className="container py-8">
       <Button variant="ghost" asChild className="mb-6 -ml-4">
-        <Link href={`/dashboard/teacher/classroom/${classroomId}?tab=quizzes`}>
+        <Link href={`/dashboard/admin/classroom/${classroomId}?tab=quizzes`}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Classroom
         </Link>
@@ -108,7 +100,9 @@ export default function TeacherQuizResultsPage() {
         </div>
         
         <Card>
-            <CardHeader><CardTitle>Quiz Summary</CardTitle></CardHeader>
+            <CardHeader>
+                <CardTitle>Quiz Summary</CardTitle>
+            </CardHeader>
             <CardContent className="grid md:grid-cols-2 gap-4">
                 <div className="p-4 bg-secondary rounded-lg">
                     <p className="text-sm text-muted-foreground">Total Submissions</p>
@@ -122,11 +116,23 @@ export default function TeacherQuizResultsPage() {
         </Card>
         
         <Card>
-            <CardHeader><CardTitle>Student Submissions</CardTitle></CardHeader>
+            <CardHeader>
+                <CardTitle>Student Submissions</CardTitle>
+                <CardDescription>
+                    {submissions.length} student(s) have completed this quiz.
+                </CardDescription>
+            </CardHeader>
             <CardContent>
                 {submissions.length > 0 ? (
                     <div className="border rounded-md">
-                        <Table><TableHeader><TableRow><TableHead><User className="inline-block h-4 w-4 mr-2" />Student</TableHead><TableHead><Calendar className="inline-block h-4 w-4 mr-2" />Submitted</TableHead><TableHead className="text-right"><Percent className="inline-block h-4 w-4 mr-2" />Score</TableHead></TableRow></TableHeader>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead><User className="inline-block h-4 w-4 mr-2" />Student Name</TableHead>
+                                    <TableHead><Calendar className="inline-block h-4 w-4 mr-2" />Submitted On</TableHead>
+                                    <TableHead className="text-right"><Percent className="inline-block h-4 w-4 mr-2" />Score</TableHead>
+                                </TableRow>
+                            </TableHeader>
                             <TableBody>
                                 {submissions.map(submission => (
                                     <TableRow key={submission.id}>
@@ -138,7 +144,11 @@ export default function TeacherQuizResultsPage() {
                             </TableBody>
                         </Table>
                     </div>
-                ) : <div className="text-center py-10"><p className="text-muted-foreground">No submissions yet.</p></div>}
+                ) : (
+                    <div className="text-center py-10">
+                        <p className="text-muted-foreground">No submissions yet.</p>
+                    </div>
+                )}
             </CardContent>
         </Card>
       </main>

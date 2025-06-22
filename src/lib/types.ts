@@ -6,7 +6,7 @@ export type UserProfile = {
   displayName: string | null;
   email: string;
   photoURL?: string | null;
-  role: 'STUDENT' | 'TEACHER';
+  role: 'STUDENT' | 'TEACHER' | 'ADMIN';
   createdAt: Timestamp | FieldValue;
   enrolledClassroomIds: string[];
   createdClassroomIds: string[];
@@ -21,6 +21,7 @@ export type Classroom = {
   creatorId: string;
   creatorName: string;
   enrolledStudentIds: string[];
+  teacherIds?: string[];
   createdAt: Timestamp;
 };
 

@@ -18,16 +18,28 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { useAuth } from "./providers/auth-provider";
 
 interface AssignmentCardProps {
   assignment: Assignment;
   classroomId: string;
-  isTeacher?: boolean;
+  isTeacher?: boolean; // isTeacher is now generic for ADMIN or TEACHER
   onDelete?: () => void;
 }
 
 export function AssignmentCard({ assignment, classroomId, isTeacher = false, onDelete }: AssignmentCardProps) {
+  const { user } = useAuth();
   const dueDate = assignment.dueDate ? format(assignment.dueDate.toDate(), "PPP") : 'No due date';
+
+  const getLinkPath = () => {
+    if (user?.role === 'ADMIN') {
+        return `/dashboard/admin/classroom/${classroomId}/assignment/${assignment.id}`;
+    }
+    if (user?.role === 'TEACHER') {
+        return `/dashboard/teacher/classroom/${classroomId}/assignment/${assignment.id}`;
+    }
+    return `/dashboard/student/classroom/${classroomId}/assignment/${assignment.id}`;
+  }
 
   const cardContent = (
      <div className="flex justify-between items-center p-4 gap-4">
@@ -39,7 +51,7 @@ export function AssignmentCard({ assignment, classroomId, isTeacher = false, onD
           {isTeacher ? (
             <>
               <Button variant="secondary" size="sm" asChild>
-                 <Link href={`/dashboard/teacher/classroom/${classroomId}/assignment/${assignment.id}`}>
+                 <Link href={getLinkPath()}>
                     View Submissions
                     <ArrowRight className="ml-2 h-4 w-4" />
                  </Link>
@@ -69,7 +81,7 @@ export function AssignmentCard({ assignment, classroomId, isTeacher = false, onD
             </>
           ) : (
               <Button asChild variant="secondary" size="sm">
-                  <Link href={`/dashboard/student/classroom/${classroomId}/assignment/${assignment.id}`}>
+                  <Link href={getLinkPath()}>
                       View Assignment
                       <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
