@@ -233,7 +233,7 @@ export default function AdminDashboardPage() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={() => setClassroomToDelete(null)}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleDeleteClassroomConfirm} variant="destructive">Delete</AlertDialogAction>
+          <AlertDialogAction onClick={handleDeleteClassroomConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -248,7 +248,7 @@ export default function AdminDashboardPage() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={() => setProductToDelete(null)}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleDeleteProductConfirm} variant="destructive">Delete</AlertDialogAction>
+          <AlertDialogAction onClick={handleDeleteProductConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
