@@ -8,7 +8,7 @@ import { z } from "zod";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/auth-provider";
-import { collection, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, writeBatch } from "firebase/firestore";
+import { collection, doc, writeBatch, serverTimestamp, arrayUnion } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 
 import { Button } from "@/components/ui/button";

@@ -145,7 +145,7 @@ export default function TeacherDashboardPage() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={() => setClassroomToDelete(null)}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleDeleteConfirm}>Delete</AlertDialogAction>
+          <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -189,25 +189,13 @@ export default function TeacherDashboardPage() {
                           <TableCell className="hidden sm:table-cell"><Badge variant="secondary">{classroom.subject}</Badge></TableCell>
                           <TableCell className="hidden sm:table-cell text-center">{classroom.enrolledStudentIds?.length || 0}</TableCell>
                           <TableCell className="text-right">
-                              <Button variant="ghost" size="icon" asChild title="View Classroom">
+                              <Button variant="outline" size="sm" asChild>
                                 <Link href={`/dashboard/teacher/classroom/${classroom.id}`}>
-                                    <BookOpen className="h-4 w-4" />
-                                    <span className="sr-only">View Classroom</span>
+                                    <BookOpen className="mr-2 h-4 w-4" />
+                                    Manage
                                 </Link>
                               </Button>
-                              <Button variant="ghost" size="icon" asChild title="Manage Students">
-                                <Link href={`/dashboard/teacher/enrollments/${classroom.id}`}>
-                                    <Users className="h-4 w-4" />
-                                    <span className="sr-only">Manage Students</span>
-                                </Link>
-                              </Button>
-                              <Button variant="ghost" size="icon" asChild title="Edit Classroom">
-                                  <Link href={`/dashboard/teacher/edit/${classroom.id}`}>
-                                      <Edit className="h-4 w-4" />
-                                      <span className="sr-only">Edit Classroom</span>
-                                  </Link>
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(classroom)} title="Delete Classroom">
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(classroom)} title="Delete Classroom" className="ml-2">
                                   <Trash2 className="h-4 w-4 text-destructive" />
                                   <span className="sr-only">Delete Classroom</span>
                               </Button>
