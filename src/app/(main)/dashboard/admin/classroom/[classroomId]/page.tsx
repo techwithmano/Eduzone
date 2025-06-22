@@ -288,7 +288,7 @@ export default function AdminClassroomPage() {
             const classroomDoc = await getDoc(classroomDocRef);
 
             if (classroomDoc.exists() && classroomDoc.data().creatorId === user.uid) {
-                const classroomData = { id: classroomDoc.id, ...classroomDoc.data() } as Classroom;
+                const classroomData = { ...classroomDoc.data(), id: classroomDoc.id } as Classroom;
                 setClassroom(classroomData);
                 editClassroomForm.reset(classroomData);
                 fetchUsers(classroomData.enrolledStudentIds || [], setEnrolledStudents);

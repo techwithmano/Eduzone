@@ -53,10 +53,9 @@ export default function StudentClassroomPage() {
         const classroomDoc = await getDoc(classroomDocRef);
 
         if (classroomDoc.exists()) {
-          const classroomData = classroomDoc.data() as Omit<Classroom, 'id'>;
           // Security check: ensure student is enrolled
           if (user.enrolledClassroomIds?.includes(classroomDoc.id)) {
-            setClassroom({ id: classroomDoc.id, ...classroomData });
+            setClassroom({ ...classroomDoc.data(), id: classroomDoc.id } as Classroom);
           } else {
             toast({ variant: 'destructive', title: 'Access Denied', description: 'You are not enrolled in this classroom.' });
             router.push('/dashboard/student');

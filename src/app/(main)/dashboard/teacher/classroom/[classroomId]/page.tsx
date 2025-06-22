@@ -157,10 +157,9 @@ export default function TeacherClassroomPage() {
         try {
             const classroomDocRef = doc(db, "classrooms", classroomId);
             const classroomDoc = await getDoc(classroomDocRef);
-            const classroomData = classroomDoc.data() as Classroom;
 
-            if (classroomDoc.exists() && classroomData.teacherIds?.includes(user.uid)) {
-                setClassroom({ id: classroomDoc.id, ...classroomData });
+            if (classroomDoc.exists() && classroomDoc.data().teacherIds?.includes(user.uid)) {
+                setClassroom({ ...classroomDoc.data(), id: classroomDoc.id } as Classroom);
 
                 Object.entries({ announcements: setAnnouncements, assignments: setAssignments, materials: setMaterials, quizzes: setQuizzes })
                     .forEach(([name, setter]) => {
