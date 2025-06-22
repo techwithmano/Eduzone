@@ -13,7 +13,7 @@ import { type Assignment, type Submission } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Loader2, User, Calendar } from 'lucide-react';
+import { ArrowLeft, User, Calendar } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -48,13 +48,11 @@ export default function TeacherAssignmentPage() {
     }
 
     const fetchAssignment = async () => {
-        setLoading(true);
         try {
             const assignmentDocRef = doc(db, `classrooms/${classroomId}/assignments`, assignmentId);
             const assignmentDoc = await getDoc(assignmentDocRef);
             if (assignmentDoc.exists()) {
                 const data = assignmentDoc.data();
-                 // Security check: only the teacher of the classroom can see this
                 const classroomDocRef = doc(db, 'classrooms', classroomId);
                 const classroomDoc = await getDoc(classroomDocRef);
                 if (classroomDoc.exists() && classroomDoc.data().creatorId === user.uid) {
@@ -70,22 +68,28 @@ export default function TeacherAssignmentPage() {
         } catch (error) {
             console.error("Error fetching assignment:", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to load assignment data.' });
-        } finally {
-            setLoading(false);
         }
     };
 
-    fetchAssignment();
+    const setupListeners = async () => {
+        setLoading(true);
+        await fetchAssignment();
+        const submissionsQuery = query(collection(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`), orderBy('submittedAt', 'desc'));
+        const unsubscribeSubmissions = onSnapshot(submissionsQuery, (snapshot) => {
+          const fetchedSubmissions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Submission));
+          setSubmissions(fetchedSubmissions);
+        }, (error) => {
+            console.error("Error fetching submissions:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch submissions.' });
+        });
+        setLoading(false);
+        return () => unsubscribeSubmissions();
+    }
 
-    // Subscribe to submissions
-    const submissionsQuery = query(collection(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`), orderBy('submittedAt', 'desc'));
-    const unsubscribeSubmissions = onSnapshot(submissionsQuery, (snapshot) => {
-      const fetchedSubmissions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Submission));
-      setSubmissions(fetchedSubmissions);
-    });
+    const unsubscribePromise = setupListeners();
 
     return () => {
-      unsubscribeSubmissions();
+      unsubscribePromise.then(unsub => unsub && unsub());
     };
 
   }, [classroomId, assignmentId, user, authLoading, router, toast]);
@@ -118,7 +122,7 @@ export default function TeacherAssignmentPage() {
       <main className="space-y-6">
         <div>
             <p className="text-sm font-medium text-primary">Assignment Details</p>
-            <h1 className="text-3xl md:text-4xl font-bold font-headline">{assignment.title}</h1>
+            <h1 className="text-3xl md:text-4xl font-bold">{assignment.title}</h1>
             <p className="text-muted-foreground mt-1">
                 Due: {assignment.dueDate ? format(assignment.dueDate.toDate(), 'PPP') : 'No due date'}
             </p>
@@ -168,7 +172,7 @@ export default function TeacherAssignmentPage() {
                                                             Submitted on {format(submission.submittedAt.toDate(), 'PPP p')}
                                                         </DialogDescription>
                                                     </DialogHeader>
-                                                    <ScrollArea className="h-64 mt-4 p-4 border rounded-md">
+                                                    <ScrollArea className="h-64 mt-4 p-4 border rounded-md bg-secondary/50">
                                                        <p className="whitespace-pre-wrap text-sm">{submission.content}</p>
                                                     </ScrollArea>
                                                      {/* Grading form can be added here in the future */}

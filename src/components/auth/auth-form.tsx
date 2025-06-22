@@ -11,7 +11,7 @@ import {
   signInWithEmailAndPassword,
   updateProfile,
 } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase/client";
 
 
@@ -26,7 +26,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CardDescription } from "@/components/ui/card";
+import { CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
@@ -66,11 +66,12 @@ export function AuthForm() {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       toast({ title: "Login successful!" });
       router.push("/dashboard");
+      router.refresh(); // Force a refresh to ensure all data is loaded
     } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Login failed",
-        description: error.message,
+        description: "Invalid email or password.",
       });
     } finally {
       setLoading(false);
@@ -89,24 +90,26 @@ export function AuthForm() {
       const user = userCredential.user;
       await updateProfile(user, { displayName: values.name });
 
-      // Create a user document in Firestore
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         displayName: values.name,
         email: values.email,
-        role: "STUDENT", // All sign-ups are students by default
-        createdAt: new Date(),
+        role: "STUDENT",
+        createdAt: serverTimestamp(),
         enrolledClassroomIds: [],
         createdClassroomIds: [],
       });
 
-      toast({ title: "Sign up successful!" });
+      toast({ title: "Sign up successful!", description: "Welcome to EduCentral!" });
       router.push("/dashboard");
+      router.refresh();
     } catch (error: any) {
-      toast({
+       toast({
         variant: "destructive",
         title: "Sign up failed",
-        description: error.message,
+        description: error.code === 'auth/email-already-in-use' 
+            ? "This email is already in use. Please log in." 
+            : "An unexpected error occurred. Please try again.",
       });
     } finally {
       setLoading(false);
@@ -120,6 +123,10 @@ export function AuthForm() {
         <TabsTrigger value="signup">Sign Up</TabsTrigger>
       </TabsList>
       <TabsContent value="login">
+        <CardHeader>
+            <CardTitle>Welcome Back</CardTitle>
+            <CardDescription>Enter your credentials to access your account.</CardDescription>
+        </CardHeader>
         <Form {...loginForm}>
           <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-6 pt-4">
             <FormField
@@ -156,11 +163,12 @@ export function AuthForm() {
         </Form>
       </TabsContent>
       <TabsContent value="signup">
-        <div className="text-center pt-4">
-          <CardDescription>
-            All new accounts are created as Students. Teacher accounts must be created by an administrator.
-          </CardDescription>
-        </div>
+        <CardHeader>
+            <CardTitle>Create an Account</CardTitle>
+            <CardDescription>
+                All new accounts are created as Students. Teacher accounts must be enabled by an administrator.
+            </CardDescription>
+        </CardHeader>
         <Form {...signUpForm}>
           <form onSubmit={signUpForm.handleSubmit(handleSignUp)} className="space-y-6 pt-4">
             <FormField

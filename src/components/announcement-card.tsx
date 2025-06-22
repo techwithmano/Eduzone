@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { type Announcement } from "@/lib/types";
 import { formatRelative } from "date-fns";
 import { Button } from "./ui/button";
@@ -30,14 +30,14 @@ export function AnnouncementCard({ announcement, onDelete }: AnnouncementCardPro
     <Card>
       <CardContent className="p-4">
         <div className="flex justify-between items-start">
-            <div className="flex-1">
+            <div className="flex-1 space-y-1">
                 <p className="text-sm font-semibold">{announcement.authorName}</p>
                 <p className="text-xs text-muted-foreground capitalize">{formattedDate}</p>
             </div>
             {onDelete && (
                  <AlertDialog>
                     <AlertDialogTrigger asChild>
-                         <Button variant="ghost" size="icon" className="h-8 w-8">
+                         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
                             <Trash2 className="h-4 w-4" />
                             <span className="sr-only">Delete Announcement</span>
                          </Button>
@@ -57,7 +57,7 @@ export function AnnouncementCard({ announcement, onDelete }: AnnouncementCardPro
                 </AlertDialog>
             )}
         </div>
-        <p className="mt-3 text-sm">{announcement.content}</p>
+        <p className="mt-3 text-sm text-foreground/90 whitespace-pre-wrap">{announcement.content}</p>
       </CardContent>
     </Card>
   );

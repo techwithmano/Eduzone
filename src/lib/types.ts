@@ -7,8 +7,8 @@ export type UserProfile = {
   email: string;
   role: 'STUDENT' | 'TEACHER';
   createdAt: Timestamp;
-  enrolledClassroomIds?: string[];
-  createdClassroomIds?: string[];
+  enrolledClassroomIds: string[];
+  createdClassroomIds: string[];
 };
 
 export type Classroom = {
@@ -19,7 +19,7 @@ export type Classroom = {
   subject: string;
   creatorId: string;
   creatorName: string;
-  enrolledStudentIds?: string[];
+  enrolledStudentIds: string[];
   createdAt: Timestamp;
 };
 
@@ -53,4 +53,5 @@ export type Submission = {
   studentName: string;
   content: string;
   submittedAt: Timestamp;
+  resubmittedAt?: Timestamp;
 };

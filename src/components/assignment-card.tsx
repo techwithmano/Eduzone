@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { type Assignment } from "@/lib/types";
 import { format } from "date-fns";
 import { Button } from "./ui/button";
-import { Trash2, Edit, ArrowRight } from "lucide-react";
+import { Trash2, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import {
   AlertDialog,
@@ -24,26 +24,27 @@ interface AssignmentCardProps {
   classroomId: string;
   isTeacher?: boolean;
   onDelete?: () => void;
-  onEdit?: () => void;
 }
 
-export function AssignmentCard({ assignment, classroomId, isTeacher = false, onDelete, onEdit }: AssignmentCardProps) {
+export function AssignmentCard({ assignment, classroomId, isTeacher = false, onDelete }: AssignmentCardProps) {
   const dueDate = assignment.dueDate ? format(assignment.dueDate.toDate(), "PPP") : 'No due date';
 
   const cardContent = (
-     <div className="flex justify-between items-center p-4">
+     <div className="flex justify-between items-center p-4 gap-4">
         <div className="flex-1 space-y-1">
-            <CardTitle>{assignment.title}</CardTitle>
-            <CardDescription>Due: {dueDate}</CardDescription>
+            <h3 className="font-semibold text-card-foreground">{assignment.title}</h3>
+            <p className="text-sm text-muted-foreground">Due: {dueDate}</p>
         </div>
-        {isTeacher ? (
-             <div className="flex items-center">
-                <Button variant="secondary" size="sm" asChild>
-                   <Link href={`/dashboard/teacher/classroom/${classroomId}/assignment/${assignment.id}`}>
-                      View Submissions
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                   </Link>
-                </Button>
+        <div className="flex items-center shrink-0">
+          {isTeacher ? (
+            <>
+              <Button variant="secondary" size="sm" asChild>
+                 <Link href={`/dashboard/teacher/classroom/${classroomId}/assignment/${assignment.id}`}>
+                    View Submissions
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                 </Link>
+              </Button>
+              {onDelete && (
                 <AlertDialog>
                     <AlertDialogTrigger asChild>
                         <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
@@ -64,26 +65,23 @@ export function AssignmentCard({ assignment, classroomId, isTeacher = false, onD
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
-             </div>
-        ) : (
-            <Button asChild variant="secondary" size="sm">
-                <Link href={`/dashboard/student/classroom/${classroomId}/assignment/${assignment.id}`}>
-                    View Assignment
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-            </Button>
-        )}
+              )}
+            </>
+          ) : (
+              <Button asChild variant="secondary" size="sm">
+                  <Link href={`/dashboard/student/classroom/${classroomId}/assignment/${assignment.id}`}>
+                      View Assignment
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+              </Button>
+          )}
+        </div>
     </div>
   );
 
   return (
     <Card className="hover:shadow-md transition-shadow">
-      {isTeacher ? (
-        // The link is now on the button, not the whole card, to prevent nesting issues.
-        cardContent
-      ) : (
-        cardContent
-      )}
+      {cardContent}
     </Card>
   );
 }

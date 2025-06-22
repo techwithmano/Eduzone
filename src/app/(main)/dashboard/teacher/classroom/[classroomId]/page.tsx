@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from "react-hook-form";
@@ -16,7 +16,7 @@ import { format } from "date-fns";
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Loader2, Megaphone, FileText, Plus, CalendarIcon, Settings } from 'lucide-react';
+import { ArrowLeft, Loader2, Megaphone, FileText, Plus, CalendarIcon, Settings, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,12 +31,12 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 
 const announcementSchema = z.object({
-  content: z.string().min(10, "Announcement must be at least 10 characters.").max(500, "Announcement cannot exceed 500 characters."),
+  content: z.string().min(10, "Announcement must be at least 10 characters.").max(1000, "Announcement cannot exceed 1000 characters."),
 });
 
 const assignmentSchema = z.object({
-  title: z.string().min(5, "Title must be at least 5 characters."),
-  description: z.string().optional(),
+  title: z.string().min(3, "Title must be at least 3 characters.").max(100, "Title cannot exceed 100 characters."),
+  description: z.string().max(5000, "Description cannot exceed 5000 characters.").optional(),
   dueDate: z.date({ required_error: "A due date is required."}),
 });
 
@@ -54,8 +54,8 @@ export default function TeacherClassroomPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
 
-  const announcementForm = useForm({ resolver: zodResolver(announcementSchema) });
-  const assignmentForm = useForm({ resolver: zodResolver(assignmentSchema) });
+  const announcementForm = useForm<z.infer<typeof announcementSchema>>({ resolver: zodResolver(announcementSchema), defaultValues: { content: "" } });
+  const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema) });
 
   const handleCreateAnnouncement = async (values: z.infer<typeof announcementSchema>) => {
     if (!user) return;
@@ -64,7 +64,7 @@ export default function TeacherClassroomPage() {
       await addDoc(collection(db, `classrooms/${classroomId}/announcements`), {
         content: values.content,
         authorId: user.uid,
-        authorName: user.displayName,
+        authorName: user.displayName || 'Teacher',
         createdAt: serverTimestamp(),
       });
       announcementForm.reset({ content: "" });
@@ -147,7 +147,6 @@ export default function TeacherClassroomPage() {
     }
     getPageData();
     
-    // Subscribe to subcollections
     const announcementsQuery = query(collection(db, `classrooms/${classroomId}/announcements`), orderBy('createdAt', 'desc'));
     const announcementsUnsub = onSnapshot(announcementsQuery, (snapshot) => {
       setAnnouncements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement)));
@@ -181,19 +180,17 @@ export default function TeacherClassroomPage() {
 
       <div className="mb-6">
         <Badge variant="secondary" className="mb-2">{classroom.subject}</Badge>
-        <h1 className="text-3xl md:text-4xl font-bold font-headline">{classroom.title}</h1>
+        <h1 className="text-3xl md:text-4xl font-bold">{classroom.title}</h1>
       </div>
 
       <Tabs defaultValue="announcements" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 mb-6">
+        <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
           <TabsTrigger value="assignments"><FileText className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
-          <TabsTrigger value="students" onClick={() => router.push(`/dashboard/teacher/enrollments/${classroomId}`)}>Students</TabsTrigger>
+          <TabsTrigger value="students" onClick={() => router.push(`/dashboard/teacher/enrollments/${classroomId}`)}><Users className="mr-2 h-4 w-4" />Students</TabsTrigger>
           <TabsTrigger value="settings" onClick={() => router.push(`/dashboard/teacher/edit/${classroomId}`)}><Settings className="mr-2 h-4 w-4" />Settings</TabsTrigger>
-          <TabsTrigger value="quizzes" disabled>Quizzes</TabsTrigger>
         </TabsList>
 
-        {/* ANNOUNCEMENTS TAB */}
         <TabsContent value="announcements">
           <Card>
             <CardHeader>
@@ -217,7 +214,7 @@ export default function TeacherClassroomPage() {
                   />
                   <Button type="submit" disabled={isSubmitting}>
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Post
+                    Post Announcement
                   </Button>
                 </form>
               </Form>
@@ -237,7 +234,6 @@ export default function TeacherClassroomPage() {
           </Card>
         </TabsContent>
 
-        {/* ASSIGNMENTS TAB */}
         <TabsContent value="assignments">
           <Card>
             <CardHeader>
@@ -314,11 +310,8 @@ export default function TeacherClassroomPage() {
             </CardContent>
           </Card>
         </TabsContent>
-
-        {/* Other Tab Stubs for future implementation */}
         <TabsContent value="students"></TabsContent>
         <TabsContent value="settings"></TabsContent>
-
       </Tabs>
     </div>
   );

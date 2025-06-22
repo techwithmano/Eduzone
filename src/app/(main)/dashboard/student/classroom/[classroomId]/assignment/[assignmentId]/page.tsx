@@ -16,7 +16,7 @@ import { type Assignment, type Submission } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, CheckCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Loader2, History } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from '@/hooks/use-toast';
@@ -56,7 +56,6 @@ export default function StudentAssignmentPage() {
     const fetchAssignmentAndSubmission = async () => {
         setLoading(true);
         try {
-            // Fetch assignment details
             const assignmentDocRef = doc(db, `classrooms/${classroomId}/assignments`, assignmentId);
             const assignmentDoc = await getDoc(assignmentDocRef);
             if (assignmentDoc.exists()) {
@@ -67,7 +66,6 @@ export default function StudentAssignmentPage() {
                 return;
             }
 
-            // Fetch student's submission
             const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, user.uid);
             const submissionDoc = await getDoc(submissionDocRef);
             if (submissionDoc.exists()) {
@@ -92,16 +90,22 @@ export default function StudentAssignmentPage() {
     setIsSubmitting(true);
     try {
         const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, user.uid);
-        const newSubmission: Omit<Submission, 'id'> = {
+        
+        const submissionData: Partial<Submission> = {
             studentId: user.uid,
             studentName: user.displayName || 'Anonymous Student',
             content: values.content,
-            submittedAt: serverTimestamp() as any, // Let server set the timestamp
+            submittedAt: serverTimestamp() as any,
         };
 
-        await setDoc(submissionDocRef, newSubmission, { merge: true });
+        if(submission) {
+            // This is a resubmission, keep original submission time if needed, but we'll overwrite for simplicity
+            submissionData.resubmittedAt = serverTimestamp() as any;
+        }
+
+        await setDoc(submissionDocRef, submissionData, { merge: true });
         
-        setSubmission({ id: user.uid, ...newSubmission }); // Optimistically update UI
+        setSubmission(prev => ({ ...prev, ...submissionData, id: user.uid } as Submission));
         toast({ title: 'Success!', description: `Your work for "${assignment.title}" has been submitted.` });
     } catch (error) {
         console.error("Error submitting work:", error);
@@ -147,7 +151,7 @@ export default function StudentAssignmentPage() {
         <main className="md:col-span-2 space-y-6">
             <div>
                 <p className="text-sm font-medium text-primary">Assignment</p>
-                <h1 className="text-3xl md:text-4xl font-bold font-headline">{assignment.title}</h1>
+                <h1 className="text-3xl md:text-4xl font-bold">{assignment.title}</h1>
                 <p className="text-muted-foreground mt-1">
                     Due: {assignment.dueDate ? format(assignment.dueDate.toDate(), 'PPP') : 'No due date'}
                 </p>
@@ -166,11 +170,16 @@ export default function StudentAssignmentPage() {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        {submission ? <CheckCircle className="h-5 w-5 text-green-500" /> : null}
+                        {submission ? <CheckCircle className="h-5 w-5 text-green-500" /> : <History className="h-5 w-5 text-yellow-500" />}
                         Your Work
                     </CardTitle>
                     <CardDescription>
-                       {submission ? 'You have submitted your work.' : 'Submit your work here. You can paste text or a link to your file (e.g. Google Docs).'}
+                       {submission ? 'You have submitted your work.' : 'Submit your work here. You can paste text or a link to a file.'}
+                       {submission?.submittedAt && (
+                         <span className="text-xs block mt-1">
+                           Last submitted: {format(submission.submittedAt.toDate(), 'PPP p')}
+                         </span>
+                       )}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>

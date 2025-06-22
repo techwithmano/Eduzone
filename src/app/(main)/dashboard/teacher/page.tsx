@@ -79,20 +79,14 @@ export default function TeacherDashboardPage() {
     try {
         const batch = writeBatch(db);
 
-        // Delete the classroom document itself
         const classroomDocRef = doc(db, "classrooms", classroomToDelete.id);
         batch.delete(classroomDocRef);
 
-        // Remove the classroom ID from the teacher's user document
         const userDocRef = doc(db, "users", user.uid);
         batch.update(userDocRef, {
             createdClassroomIds: arrayRemove(classroomToDelete.id)
         });
         
-        // Note: In a real-world scenario, you would also need to handle:
-        // 1. Removing the classroom from all enrolled students' `enrolledClassroomIds` array.
-        // 2. Deleting all subcollections (announcements, assignments, etc.) within the classroom, which requires a Cloud Function.
-
         await batch.commit();
 
         toast({
@@ -133,6 +127,7 @@ export default function TeacherDashboardPage() {
           <AlertDialogDescription>
             This action cannot be undone. This will permanently delete the
             classroom "{classroomToDelete?.title}" and remove it from your dashboard.
+            Enrolled students will lose access.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -145,7 +140,7 @@ export default function TeacherDashboardPage() {
     <div className="container py-8">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
         <div className="space-y-1">
-            <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl font-headline">
+            <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl">
             Teacher Dashboard
             </h1>
             <p className="text-muted-foreground">Manage your classrooms here.</p>
@@ -170,7 +165,7 @@ export default function TeacherDashboardPage() {
                     <TableRow>
                         <TableHead>Title</TableHead>
                         <TableHead className="hidden sm:table-cell">Subject</TableHead>
-                        <TableHead className="hidden sm:table-cell">Enrolled</TableHead>
+                        <TableHead className="hidden sm:table-cell text-center">Enrolled</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                     </TableHeader>
@@ -179,7 +174,7 @@ export default function TeacherDashboardPage() {
                         <TableRow key={classroom.id}>
                           <TableCell className="font-medium">{classroom.title}</TableCell>
                           <TableCell className="hidden sm:table-cell"><Badge variant="secondary">{classroom.subject}</Badge></TableCell>
-                          <TableCell className="hidden sm:table-cell">{classroom.enrolledStudentIds?.length || 0}</TableCell>
+                          <TableCell className="hidden sm:table-cell text-center">{classroom.enrolledStudentIds?.length || 0}</TableCell>
                           <TableCell className="text-right">
                               <Button variant="ghost" size="icon" asChild title="View Classroom">
                                 <Link href={`/dashboard/teacher/classroom/${classroom.id}`}>
@@ -200,7 +195,7 @@ export default function TeacherDashboardPage() {
                                   </Link>
                               </Button>
                               <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(classroom)} title="Delete Classroom">
-                                  <Trash2 className="h-4 w-4" />
+                                  <Trash2 className="h-4 w-4 text-destructive" />
                                   <span className="sr-only">Delete Classroom</span>
                               </Button>
                           </TableCell>
