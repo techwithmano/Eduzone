@@ -5,92 +5,86 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- Helper Functions ---
-
     function isAuth() {
       return request.auth != null;
     }
 
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    function isUser(userId) {
+      return isAuth() && request.auth.uid == userId;
     }
 
-    function hasRole(role) {
-      return isAuth() && 'role' in getUserData() && getUserData().role == role;
+    function getUserData(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+
+    function getRequestingUserRole() {
+      if (!isAuth()) {
+        return '';
+      }
+      let userData = getUserData(request.auth.uid);
+      if ('role' in userData) {
+        return userData.role;
+      }
+      return 'STUDENT';
     }
     
     function isAdmin() {
-      return hasRole('ADMIN');
+      return getRequestingUserRole() == 'ADMIN';
     }
 
+    function isCreator(classroomDoc) {
+      return isAuth() && 'creatorId' in classroomDoc && classroomDoc.creatorId == request.auth.uid;
+    }
+    
+    function isAssignedTeacher(classroomDoc) {
+      return isAuth() && 'teacherIds' in classroomDoc && request.auth.uid in classroomDoc.teacherIds;
+    }
+    
     function isEnrolled(classroomId) {
-      return isAuth() && 
-             'enrolledClassroomIds' in getUserData() && 
-             classroomId in getUserData().enrolledClassroomIds;
-    }
-
-    function isTeacherForClassroom(classroomId) {
-      return isAuth() &&
-             exists(/databases/$(database)/documents/classrooms/$(classroomId)) &&
-             'teacherIds' in get(/databases/$(database)/documents/classrooms/$(classroomId)).data && 
-             request.auth.uid in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherIds;
+      let userDoc = getUserData(request.auth.uid);
+      return 'enrolledClassroomIds' in userDoc && classroomId in userDoc.enrolledClassroomIds;
     }
     
     // --- Collection Rules ---
 
     match /users/{userId} {
-      allow write: if isAdmin();
-      allow get: if isAuth() && (request.auth.uid == userId || isAdmin());
-      allow list: if isAdmin();
-      allow update: if isAuth() && request.auth.uid == userId;
+      allow read: if isAuth();
+      allow create: if isUser(userId);
+      allow update: if isUser(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    match /classrooms/{classroomId} {
+      allow read: if isAuth() && (isCreator(resource.data) || isAssignedTeacher(resource.data) || isEnrolled(classroomId));
+      allow list: if isAuth();
+      allow create: if isAdmin();
+      allow update, delete: if isCreator(resource.data) && isAdmin();
+
+      // Generic rule for classroom sub-collections (announcements, assignments, quizzes, materials).
+      match /{subCollection}/{docId} {
+        function getParentClassroomData() {
+          return get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
+        }
+
+        allow read: if isAuth() && (isCreator(getParentClassroomData()) || isAssignedTeacher(getParentClassroomData()) || isEnrolled(classroomId));
+        allow write: if isAuth() && (isCreator(getParentClassroomData()) || isAssignedTeacher(getParentClassroomData()));
+
+        // Submissions for assignments and quizzes
+        match /submissions/{submissionId} {
+           allow read, delete: if isAuth() && (isCreator(getParentClassroomData()) || isAssignedTeacher(getParentClassroomData()));
+           allow write: if isUser(submissionId) && isEnrolled(classroomId);
+        }
+      }
     }
     
     match /products/{productId} {
-        allow read: if true;
-        allow create, update, delete: if isAdmin();
+      allow read, list: if true;
+      allow create, update, delete: if isAdmin();
     }
     
     match /contacts/{contactId} {
-        allow create: if true;
-        allow read, write, delete: if isAdmin();
-    }
-
-    match /classrooms/{classroomId} {
-        allow create, delete, update: if isAdmin();
-        allow get: if isAuth() && (isAdmin() || isTeacherForClassroom(classroomId) || isEnrolled(classroomId));
-        allow list: if isAuth();
-
-        // --- Sub-collection Rules ---
-
-        match /announcements/{announcementId} {
-            allow read: if isEnrolled(classroomId) || isTeacherForClassroom(classroomId) || isAdmin();
-            allow create, delete: if isTeacherForClassroom(classroomId) || isAdmin();
-        }
-        
-        match /materials/{materialId} {
-            allow read: if isEnrolled(classroomId) || isTeacherForClassroom(classroomId) || isAdmin();
-            allow create, delete: if isTeacherForClassroom(classroomId) || isAdmin();
-        }
-
-        match /assignments/{assignmentId} {
-            allow read: if isEnrolled(classroomId) || isTeacherForClassroom(classroomId) || isAdmin();
-            allow create, delete: if isTeacherForClassroom(classroomId) || isAdmin();
-
-            match /submissions/{submissionId} {
-                allow read: if isTeacherForClassroom(classroomId) || isAdmin();
-                allow write: if isAuth() && request.auth.uid == submissionId && isEnrolled(classroomId);
-            }
-        }
-        
-        match /quizzes/{quizId} {
-            allow read: if isEnrolled(classroomId) || isTeacherForClassroom(classroomId) || isAdmin();
-            allow create, delete: if isTeacherForClassroom(classroomId) || isAdmin();
-            
-            match /submissions/{submissionId} {
-                allow read: if isTeacherForClassroom(classroomId) || isAdmin();
-                allow create: if isAuth() && request.auth.uid == submissionId && isEnrolled(classroomId);
-                allow update, delete: if false;
-            }
-        }
+      allow write: if true;
+      allow read: if isAdmin();
     }
   }
 }

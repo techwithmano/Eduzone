@@ -1,3 +1,4 @@
+
 "use client";
 
 import { signOut } from "firebase/auth";
@@ -30,13 +31,17 @@ export function UserNav() {
     router.push("/");
   };
   
-  const getInitials = (name: string | null | undefined) => {
-    if (!name) return "U";
-    const names = name.split(' ');
-    if (names.length > 1) {
-      return names[0][0] + names[names.length - 1][0];
+  const getInitials = (name: string | null | undefined): string => {
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return "U";
     }
-    return name.substring(0, 2);
+    const names = name.trim().split(/\s+/);
+    if (names.length > 1) {
+      const firstInitial = names[0][0];
+      const lastInitial = names[names.length - 1][0];
+      return `${firstInitial}${lastInitial}`.toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
   }
 
   return (
