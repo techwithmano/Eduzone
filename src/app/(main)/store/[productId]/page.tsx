@@ -66,6 +66,7 @@ export default function ProductPage() {
             toast({
                 title: "Please log in",
                 description: "You need to be logged in to purchase items.",
+                variant: 'destructive'
             });
             router.push('/auth');
         } else {
@@ -81,7 +82,7 @@ export default function ProductPage() {
             <div className="container py-8 md:py-12">
                 <Skeleton className="h-8 w-48 mb-8" />
                 <div className="grid md:grid-cols-2 gap-8 md:gap-12">
-                    <Skeleton className="aspect-video w-full rounded-lg" />
+                    <Skeleton className="aspect-square w-full rounded-lg" />
                     <div className="space-y-4">
                         <Skeleton className="h-6 w-24" />
                         <Skeleton className="h-10 w-3/4" />
@@ -118,7 +119,7 @@ export default function ProductPage() {
                     </Link>
                 </Button>
                 <div className="grid md:grid-cols-2 gap-8 md:gap-12">
-                    <div className="relative aspect-video">
+                    <div className="relative aspect-square">
                          <Image
                             src={product.imageUrl}
                             alt={product.title}
@@ -129,10 +130,13 @@ export default function ProductPage() {
                     </div>
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <Badge variant="outline">{product.subject}</Badge>
+                            <Badge variant="outline">{product.category}</Badge>
                             <h1 className="text-3xl md:text-4xl font-bold font-headline">{product.title}</h1>
+                            <p className="text-sm text-muted-foreground">Language: {product.language}</p>
+                            <p className="text-sm text-muted-foreground">Sold by: {product.creatorName}</p>
                         </div>
                         <p className="text-muted-foreground text-lg">{product.description}</p>
+                        <p className="text-3xl font-bold">{product.priceKWD.toFixed(2)} KWD</p>
                         
                         <Button size="lg" onClick={handleBuyNow}>
                             <ShoppingCart className="mr-2 h-5 w-5" />
