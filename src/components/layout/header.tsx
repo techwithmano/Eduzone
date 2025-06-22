@@ -7,7 +7,7 @@ import { Menu } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Icons } from "@/components/icons";
 import { useAuth } from "@/components/providers/auth-provider";
 import { UserNav } from "@/components/auth/user-nav";
@@ -68,6 +68,8 @@ export function Header() {
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="pr-0">
+            <SheetTitle className="sr-only">Menu</SheetTitle>
+            <SheetDescription className="sr-only">Main navigation menu</SheetDescription>
             <Link
               href="/"
               className="mb-6 flex items-center space-x-2"
