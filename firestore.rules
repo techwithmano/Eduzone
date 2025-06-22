@@ -1,79 +1,81 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Helper Functions ---
-    // Checks if the requesting user is the teacher or an enrolled student of a specific classroom.
-    function isClassroomMember(classroomId) {
-      let classroom = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
-      return request.auth != null && (
-        classroom.creatorId == request.auth.uid ||
-        (classroom.enrolledStudentIds is list && request.auth.uid in classroom.enrolledStudentIds)
-      );
+    function isTeacher(userId) {
+      // Check if the user's role is 'TEACHER'.
+      return get(/databases/$(database)/documents/users/$(userId)).data.role == 'TEACHER';
     }
     
-    // Checks if the requesting user is the teacher of a specific classroom.
     function isClassroomTeacher(classroomId) {
-      return request.auth != null && get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId == request.auth.uid;
-    }
-
-
-    // --- Collection Rules ---
-
-    // Users can read public profile info, but only write to their own document.
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId;
-    }
-
-    // Contact messages can only be created. No one can read/update them from the client.
-    match /contacts/{contactId} {
-      allow read, update, delete: if false;
-      allow create: if true;
+      // Check if the requesting user is the creator of the classroom.
+      return request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId;
     }
     
-    // Products are publicly readable, but not writable from the client.
-    match /products/{productId} {
-      allow read: if true;
-      allow write: if false;
+    function isEnrolled(classroomId) {
+      // Check if the requesting user is in the classroom's list of enrolled students.
+      let classroom = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
+      return 'enrolledStudentIds' in classroom && request.auth.uid in classroom.enrolledStudentIds;
     }
 
-    // Classrooms and their subcollections
+    match /users/{userId} {
+      // A user can read their own profile.
+      allow get: if request.auth.uid == userId;
+
+      // A teacher can query the users collection ONLY to find a student by email.
+      allow list: if isTeacher(request.auth.uid)
+                   && request.query.limit <= 1
+                   && request.query.where[0][0] == 'email';
+
+      // A user can create their own profile upon sign-up.
+      allow create: if request.auth.uid == userId;
+
+      // A user can update their own profile, but cannot change their role.
+      // A teacher can update a student's `enrolledClassroomIds` to enroll/unenroll them,
+      // but cannot change any other field.
+      allow update: if (request.auth.uid == userId && request.resource.data.role == resource.data.role)
+                   || (isTeacher(request.auth.uid)
+                       // Check that ONLY enrolledClassroomIds is being changed.
+                       && request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(['enrolledClassroomIds']));
+    }
+    
     match /classrooms/{classroomId} {
-      // Teachers can create, update, and delete their own classrooms.
-      allow create: if request.auth != null && request.resource.data.creatorId == request.auth.uid;
+      // A user can read a classroom doc if they are the teacher or enrolled.
+      allow get: if isClassroomTeacher(classroomId) || isEnrolled(classroomId);
+
+      // Teachers can list classrooms they created. Students can list classrooms they are in.
+      allow list: if (request.auth.uid != null && isTeacher(request.auth.uid) && request.query.where[0][0] == 'creatorId' && request.query.where[0][2] == request.auth.uid)
+                   || (request.auth.uid != null && request.query.where[0][0] == 'enrolledStudentIds' && request.query.where[0][1] == 'array-contains' && request.query.where[0][2] == request.auth.uid);
+      
+      // Teachers can create, update, and delete classrooms they own.
+      allow create: if isTeacher(request.auth.uid) && request.resource.data.creatorId == request.auth.uid;
       allow update, delete: if isClassroomTeacher(classroomId);
       
-      // Rule to get a SINGLE classroom document.
-      allow get: if isClassroomMember(classroomId);
-
-      // Rule to LIST classrooms (for dashboard queries).
-      // This allows authenticated users to attempt queries. Security is enforced
-      // by the client-side queries (e.g., where("creatorId", "==", uid)).
-      allow list: if request.auth != null;
-      
-      // Announcements subcollection
       match /announcements/{announcementId} {
-        allow read: if isClassroomMember(classroomId);
+        allow get, list: if isClassroomTeacher(classroomId) || isEnrolled(classroomId);
         allow write: if isClassroomTeacher(classroomId);
       }
       
-      // Assignments subcollection
       match /assignments/{assignmentId} {
-        allow read: if isClassroomMember(classroomId);
+        allow get, list: if isClassroomTeacher(classroomId) || isEnrolled(classroomId);
         allow write: if isClassroomTeacher(classroomId);
         
-        // Submissions sub-subcollection
         match /submissions/{studentId} {
-          // Student can read their own submission. Teacher can read any submission in their class.
-          allow read: if request.auth != null && (request.auth.uid == studentId || isClassroomTeacher(classroomId));
-          
-          // A student can only write to their own submission document.
-          allow write: if request.auth != null && request.auth.uid == studentId;
+          allow get: if request.auth.uid == studentId || isClassroomTeacher(classroomId);
+          allow list: if isClassroomTeacher(classroomId);
+          allow create, update: if request.auth.uid == studentId;
         }
       }
+    }
+    
+    match /products/{productId} {
+      allow get, list: if true;
+    }
+
+    match /contacts/{contactId} {
+      allow create: if true;
     }
   }
 }

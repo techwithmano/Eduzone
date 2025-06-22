@@ -10,7 +10,7 @@ import { z } from "zod";
 import {
   doc, getDoc, collection, addDoc, query, orderBy, onSnapshot,
   serverTimestamp, deleteDoc, Unsubscribe, updateDoc,
-  where, getDocs, writeBatch, arrayUnion, arrayRemove, documentId
+  where, getDocs, writeBatch, arrayUnion, arrayRemove, documentId, limit
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -143,18 +143,32 @@ export default function TeacherClassroomPage() {
   // Student Management
   const fetchEnrolledStudents = useCallback(async (studentIds: string[]) => {
       if (studentIds.length > 0) {
-        const studentsQuery = query(collection(db, "users"), where(documentId(), "in", studentIds));
-        const studentsSnapshot = await getDocs(studentsQuery);
-        const fetchedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as EnrolledStudent[];
+        // Use documentId() with 'in' query for efficiency, max 30 IDs per query in Firestore
+        const chunks = [];
+        for (let i = 0; i < studentIds.length; i += 30) {
+            chunks.push(studentIds.slice(i, i + 30));
+        }
+        
+        const studentPromises = chunks.map(chunk => {
+            const studentsQuery = query(collection(db, "users"), where(documentId(), "in", chunk));
+            return getDocs(studentsQuery);
+        });
+        
+        const studentSnapshots = await Promise.all(studentPromises);
+        const fetchedStudents = studentSnapshots.flatMap(snapshot => 
+            snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EnrolledStudent))
+        );
+        
         setEnrolledStudents(fetchedStudents);
       } else {
         setEnrolledStudents([]);
       }
   }, []);
+
   const handleAddStudent = async (values: z.infer<typeof addStudentSchema>) => {
     setIsSubmitting(true);
     try {
-      const usersQuery = query(collection(db, "users"), where("email", "==", values.email));
+      const usersQuery = query(collection(db, "users"), where("email", "==", values.email), limit(1));
       const userSnapshot = await getDocs(usersQuery);
 
       if (userSnapshot.empty) {
@@ -249,7 +263,7 @@ export default function TeacherClassroomPage() {
                 const classroomData = { id: classroomDoc.id, ...classroomDoc.data() } as Classroom;
                 setClassroom(classroomData);
                 editClassroomForm.reset(classroomData);
-                if (classroomData.enrolledStudentIds) {
+                if (classroomData.enrolledStudentIds && classroomData.enrolledStudentIds.length > 0) {
                     await fetchEnrolledStudents(classroomData.enrolledStudentIds);
                 }
 
