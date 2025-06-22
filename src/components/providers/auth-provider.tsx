@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/client';
 
 export interface UserProfile extends User {
@@ -23,31 +23,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    let unsubscribeUser: (() => void) | undefined;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      // If there was a previous user snapshot listener, unsubscribe from it.
+      if (unsubscribeUser) {
+        unsubscribeUser();
+      }
+
       if (user) {
-        // User is signed in, now get their custom role and data from Firestore.
+        // User is signed in, set up a real-time listener for their data.
+        setLoading(true);
         const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          setUser({
-            ...user,
-            role: userData.role,
-            enrolledClassroomIds: userData.enrolledClassroomIds || [],
-            createdClassroomIds: userData.createdClassroomIds || [],
-          });
-        } else {
-           // This case can happen if a user was created in auth but not in firestore
-          setUser(user);
-        }
+        
+        unsubscribeUser = onSnapshot(userDocRef, (userDoc) => {
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setUser({
+              ...user,
+              role: userData.role,
+              enrolledClassroomIds: userData.enrolledClassroomIds || [],
+              createdClassroomIds: userData.createdClassroomIds || [],
+            });
+          } else {
+             // This case can happen if a user was created in auth but not in firestore
+            setUser(user);
+          }
+          setLoading(false);
+        }, (error) => {
+            console.error("Error listening to user document:", error);
+            setUser(user); // Set basic user info even if firestore listener fails
+            setLoading(false);
+        });
+
       } else {
         // User is signed out
         setUser(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    // Cleanup function for the main effect
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeUser) {
+        unsubscribeUser();
+      }
+    };
   }, []);
 
   return (
