@@ -1,98 +1,98 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // =================================
-    // Helper Functions
-    // =================================
+    // --- Helper Functions ---
     function isSignedIn() {
       return request.auth != null;
     }
-    
-    // Check if the requesting user has the 'TEACHER' role
-    function isRequestingUserTeacher() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'TEACHER';
-    }
-    
-    // Check if the requesting user is the owner of the document
+
     function isOwner(userId) {
-      return request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Check if the teacher owns the specific classroom
-    function isClassroomOwner(classroomId) {
-      return get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId == request.auth.uid;
-    }
-    
-    // Check if the user is a member of the classroom (either student or teacher owner)
-    function isClassroomMember(classroomId) {
-      let classroom = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
-      return request.auth.uid == classroom.creatorId || request.auth.uid in classroom.enrolledStudentIds;
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
-    // =================================
-    // Collection Rules
-    // =================================
+    function isTeacher() {
+      return isSignedIn() && getUserData().role == 'TEACHER';
+    }
 
-    // User Profiles
+    function getClassroom(classroomId) {
+        return get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
+    }
+
+    function isClassroomTeacher(classroomId) {
+        return isTeacher() && getClassroom(classroomId).creatorId == request.auth.uid;
+    }
+
+    function isEnrolled(classroomId) {
+        return isSignedIn() && request.auth.uid in getClassroom(classroomId).enrolledStudentIds;
+    }
+
+    // --- Collection Rules ---
+
+    // USERS Collection
+    // Users can only be created during signup.
+    // They can be read by their owner or any teacher.
+    // They can be updated by their owner, or a teacher can update enrollment status.
     match /users/{userId} {
-      allow get: if isSignedIn();
-      allow list: if isRequestingUserTeacher(); // Only teachers can search for users (to enroll them)
-      
-      // A user can create their own document during signup.
-      allow create: if request.auth.uid == userId;
-
-      // Users can update their own documents.
-      // Teachers can ONLY update the `enrolledClassroomIds` of other users.
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow get: if isOwner(userId) || isTeacher();
+      allow list: if isTeacher();
       allow update: if isOwner(userId) || 
-                      (isRequestingUserTeacher() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['enrolledClassroomIds']));
-                      
-      allow delete: if false; // Users can't delete their own accounts
+        (isTeacher() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['enrolledClassroomIds']));
+      allow delete: if false;
     }
     
-    // Classrooms
+    // CLASSROOMS Collection
     match /classrooms/{classroomId} {
-      allow get: if isSignedIn() && isClassroomMember(classroomId);
-      allow list: if isSignedIn(); // Broad list for dashboards, will be filtered on the client.
-      
-      // Only a teacher can create a classroom, and they must be the creator.
-      allow create: if isRequestingUserTeacher() && request.resource.data.creatorId == request.auth.uid;
-      
-      // Only the teacher who owns the classroom can update or delete it.
-      allow update, delete: if isRequestingUserTeacher() && isClassroomOwner(classroomId);
+        // Logged-in users can query for classrooms. The `get` rule below secures the actual data access.
+        allow list: if isSignedIn();
+        
+        // Only students enrolled in the class or the teacher who created it can get the document.
+        allow get: if isEnrolled(classroomId) || isClassroomTeacher(classroomId);
 
-      // --- Subcollections ---
-      match /announcements/{announcementId} {
-        allow read: if isClassroomMember(classroomId);
-        allow create, delete: if isClassroomOwner(classroomId) && isRequestingUserTeacher();
-      }
-      
-      match /assignments/{assignmentId} {
-        allow read: if isClassroomMember(classroomId);
-        allow create, delete: if isClassroomOwner(classroomId) && isRequestingUserTeacher();
+        // Only authenticated teachers can create classrooms, and they must be the author.
+        allow create: if isTeacher() && request.resource.data.creatorId == request.auth.uid;
 
-        match /submissions/{submissionId} {
-            // A student can read/write their OWN submission. `submissionId` IS the student's UID.
-            // The teacher of the classroom can read any submission.
-            allow read: if (isOwner(submissionId) || (isClassroomOwner(classroomId) && isRequestingUserTeacher()));
-            allow create, update: if isOwner(submissionId);
-            allow delete: if false;
+        // Only the teacher who created the classroom can update or delete it.
+        allow update, delete: if isClassroomTeacher(classroomId);
+        
+        // ANNOUNCEMENTS Subcollection
+        match /announcements/{announcementId} {
+            allow read: if isEnrolled(classroomId) || isClassroomTeacher(classroomId);
+            allow write: if isClassroomTeacher(classroomId);
         }
-      }
+
+        // ASSIGNMENTS Subcollection
+        match /assignments/{assignmentId} {
+            allow read: if isEnrolled(classroomId) || isClassroomTeacher(classroomId);
+            allow write: if isClassroomTeacher(classroomId);
+
+            // SUBMISSIONS Sub-subcollection
+            match /submissions/{submissionId} {
+                // The student who submitted it can read/write it. The class teacher can only read it.
+                allow read: if (isSignedIn() && request.auth.uid == submissionId) || isClassroomTeacher(classroomId);
+                allow write: if isSignedIn() && request.auth.uid == submissionId;
+            }
+        }
     }
-    
-    // Products (Read-only for users)
+
+    // PRODUCTS Collection
+    // Anyone can view products, but no one can write to them from the client.
     match /products/{productId} {
       allow read: if true;
-      allow create, update, delete: if false;
+      allow write: if false;
     }
-
-    // Contact Form (Write-only for users)
+    
+    // CONTACTS Collection
+    // Anyone can send a contact message, but no one can read them from the client.
     match /contacts/{contactId} {
-      allow create: if true;
-      allow read, update, delete: if false;
+        allow create: if true;
+        allow read, update, delete: if false;
     }
   }
 }
