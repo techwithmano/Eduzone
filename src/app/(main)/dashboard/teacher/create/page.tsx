@@ -8,7 +8,7 @@ import { z } from "zod";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/auth-provider";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 
 import { Button } from "@/components/ui/button";
@@ -50,14 +50,29 @@ export default function CreateClassroomPage() {
     }
     setLoading(true);
     try {
-        await addDoc(collection(db, "classrooms"), {
+        const batch = writeBatch(db);
+
+        // 1. Create the new classroom document
+        const newClassroomRef = doc(collection(db, "classrooms"));
+        batch.set(newClassroomRef, {
             ...values,
+            id: newClassroomRef.id,
             imageUrl: `https://placehold.co/600x400.png`,
             creatorId: user.uid,
             creatorName: user.displayName || "Anonymous",
             enrolledStudentIds: [],
             createdAt: serverTimestamp(),
         });
+        
+        // 2. Add the classroom ID to the teacher's user document
+        const userDocRef = doc(db, "users", user.uid);
+        batch.update(userDocRef, {
+            createdClassroomIds: arrayUnion(newClassroomRef.id)
+        });
+
+        // 3. Commit the batch
+        await batch.commit();
+
         toast({
           title: "Classroom Created!",
           description: "Your new classroom has been created.",

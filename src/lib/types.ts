@@ -8,6 +8,7 @@ export type UserProfile = {
   role: 'STUDENT' | 'TEACHER';
   createdAt: Timestamp;
   enrolledClassroomIds?: string[];
+  createdClassroomIds?: string[];
 };
 
 export type Classroom = {

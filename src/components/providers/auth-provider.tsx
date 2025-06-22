@@ -7,6 +7,8 @@ import { auth, db } from '@/lib/firebase/client';
 
 export interface UserProfile extends User {
   role?: 'STUDENT' | 'TEACHER';
+  enrolledClassroomIds?: string[];
+  createdClassroomIds?: string[];
 }
 
 type AuthContextType = {
@@ -23,7 +25,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // User is signed in, now get their custom role from Firestore.
+        // User is signed in, now get their custom role and data from Firestore.
         const userDocRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userDocRef);
         if (userDoc.exists()) {
@@ -31,6 +33,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser({
             ...user,
             role: userData.role,
+            enrolledClassroomIds: userData.enrolledClassroomIds || [],
+            createdClassroomIds: userData.createdClassroomIds || [],
           });
         } else {
            // This case can happen if a user was created in auth but not in firestore
