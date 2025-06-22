@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { doc, getDoc, setDoc, serverTimestamp, onSnapshot, collection, query, where } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, collection, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
 import { useForm, Controller } from "react-hook-form";
@@ -74,7 +74,7 @@ export default function StudentQuizPage() {
                 
                 const submissionDoc = await getDoc(submissionDocRef);
                 if (submissionDoc.exists()) {
-                    setSubmission(submissionDoc.data() as QuizSubmission);
+                    setSubmission({ id: submissionDoc.id, ...submissionDoc.data() } as QuizSubmission);
                 }
 
             } catch (error) {
@@ -111,12 +111,12 @@ export default function StudentQuizPage() {
                 answers,
                 score,
                 totalQuestions: quiz.questions.length,
-                submittedAt: serverTimestamp() as any,
+                submittedAt: Timestamp.now(),
             };
 
             const submissionDocRef = doc(db, `classrooms/${classroomId}/quizzes/${quizId}/submissions`, user.uid);
             await setDoc(submissionDocRef, submissionData);
-            setSubmission(submissionData as QuizSubmission);
+            setSubmission({ ...submissionData, id: user.uid });
 
             toast({ title: 'Quiz Submitted!', description: `You scored ${score.toFixed(0)}%` });
 
