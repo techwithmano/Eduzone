@@ -68,15 +68,24 @@ const GradeForm = ({ submission, classroomId, assignmentId }: { submission: Subm
                 const storageRef = ref(storage, `graded-submissions/${classroomId}/${assignmentId}/${submission.id}/${feedbackFile.name}`);
                 const uploadTask = uploadBytesResumable(storageRef, feedbackFile);
 
-                uploadTask.on('state_changed', (snapshot) => {
-                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    setUploadProgress(progress);
+                await new Promise<void>((resolve, reject) => {
+                    uploadTask.on(
+                        'state_changed',
+                        (snapshot) => {
+                            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                            setUploadProgress(progress);
+                        },
+                        (error) => {
+                            console.error("Upload error:", error);
+                            reject(error);
+                        },
+                        async () => {
+                            feedbackFileUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                            feedbackFileName = feedbackFile.name;
+                            resolve();
+                        }
+                    );
                 });
-
-                await uploadTask; // Wait for upload to complete
-
-                feedbackFileUrl = await getDownloadURL(uploadTask.snapshot.ref);
-                feedbackFileName = feedbackFile.name;
             }
             
             const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, submission.id);
@@ -249,9 +258,29 @@ export default function TeacherAssignmentPage() {
                                                     </DialogHeader>
                                                     <ScrollArea className="h-[60vh] p-1">
                                                         <div className="p-4 border rounded-md bg-secondary/50 space-y-4 mb-4">
-                                                            {submission.content && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{submission.content}</p>}
-                                                            {submission.fileUrl && <Button asChild variant="outline"><a href={submission.fileUrl} target="_blank" download={submission.fileName || 'submission'} rel="noopener noreferrer"><Download className="mr-2 h-4 w-4" />{submission.fileName || 'Download File'}</a></Button>}
-                                                            {!submission.content && !submission.fileUrl && <p className="text-muted-foreground text-sm">No content or file was submitted.</p>}
+                                                            {assignment.submissionFolderUrl ? (
+                                                                <div className="space-y-2">
+                                                                    <p className="text-sm font-semibold">Student work is in Google Drive.</p>
+                                                                    <p className="text-xs text-muted-foreground">The student was instructed to name the file <code className="bg-muted p-1 rounded-sm font-mono">{submission.studentId}_{assignmentId}</code>.</p>
+                                                                    <Button asChild variant="outline">
+                                                                        <a href={assignment.submissionFolderUrl} target="_blank" rel="noopener noreferrer">
+                                                                            <ExternalLink className="mr-2 h-4 w-4"/>
+                                                                            Open Submission Folder
+                                                                        </a>
+                                                                    </Button>
+                                                                </div>
+                                                            ) : (
+                                                                submission.fileUrl && <Button asChild variant="outline"><a href={submission.fileUrl} target="_blank" download={submission.fileName || 'submission'} rel="noopener noreferrer"><Download className="mr-2 h-4 w-4" />{submission.fileName || 'Download File'}</a></Button>
+                                                            )}
+                                                            
+                                                            {submission.content && (
+                                                                <div>
+                                                                    <p className="text-sm font-semibold mt-4">Student's Comment:</p>
+                                                                    <p className="whitespace-pre-wrap text-sm text-muted-foreground">{submission.content}</p>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {!assignment.submissionFolderUrl && !submission.content && !submission.fileUrl && <p className="text-muted-foreground text-sm">No content or file was submitted.</p>}
                                                         </div>
                                                         {submission.status === 'graded' ? (
                                                             <div className="p-4 border rounded-md space-y-3">

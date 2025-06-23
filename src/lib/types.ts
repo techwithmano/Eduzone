@@ -54,6 +54,7 @@ export type Assignment = {
   description?: string;
   dueDate: Timestamp;
   createdAt: Timestamp;
+  submissionFolderUrl?: string;
 };
 
 export type Submission = {

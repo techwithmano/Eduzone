@@ -23,7 +23,7 @@ import { Loader2, ArrowLeft, Megaphone, FileText, Plus, CalendarIcon, Notebook, 
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from '@/hooks/use-toast';
 import { AnnouncementCard } from '@/components/announcement-card';
 import { AssignmentCard } from '@/components/assignment-card';
@@ -45,6 +45,7 @@ const assignmentSchema = z.object({
   title: z.string().min(3).max(100),
   description: z.string().max(5000).optional(),
   dueDate: z.date(),
+  submissionFolderUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
 });
 const materialSchema = z.object({
   title: z.string().min(3).max(100),
@@ -96,7 +97,7 @@ export default function TeacherClassroomPage() {
   const [isQuizDialogOpen, setIsQuizDialogOpen] = useState(false);
 
   const announcementForm = useForm<z.infer<typeof announcementSchema>>({ resolver: zodResolver(announcementSchema), defaultValues: { content: "" } });
-  const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema), defaultValues: { title: "", description: "" } });
+  const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema), defaultValues: { title: "", description: "", submissionFolderUrl: "" } });
   const materialForm = useForm<z.infer<typeof materialSchema>>({ resolver: zodResolver(materialSchema), defaultValues: { title: "", description: "", link: "" } });
   const quizForm = useForm<z.infer<typeof quizSchema>>({ resolver: zodResolver(quizSchema), defaultValues: { title: "", description: "", questions: [] }});
   const { fields: quizQuestions, append: appendQuizQuestion, remove: removeQuizQuestion } = useFieldArray({ control: quizForm.control, name: "questions" });
@@ -105,12 +106,18 @@ export default function TeacherClassroomPage() {
     if (!user) return;
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, `classrooms/${classroomId}/${collectionName}`), {
+      const dataToSave: any = {
         ...data,
         authorId: user.uid,
         authorName: user.displayName,
         createdAt: serverTimestamp(),
-      });
+      };
+      
+      if (collectionName === 'assignments' && !data.submissionFolderUrl) {
+        delete dataToSave.submissionFolderUrl;
+      }
+
+      await addDoc(collection(db, `classrooms/${classroomId}/${collectionName}`), dataToSave);
       toast({ title: `${collectionName.slice(0, -1)} created!` });
       return true;
     } catch (error) {
@@ -321,6 +328,14 @@ export default function TeacherClassroomPage() {
                                     </Popover>
                                     <FormMessage />
                                 </FormItem>
+                            )} />
+                            <FormField control={assignmentForm.control} name="submissionFolderUrl" render={({ field }) => ( 
+                                <FormItem>
+                                    <FormLabel>Google Drive Folder Link (Optional)</FormLabel>
+                                    <FormControl><Input placeholder="https://drive.google.com/..." {...field} /></FormControl>
+                                    <FormDescription>If provided, students will be instructed to submit their work here.</FormDescription>
+                                    <FormMessage />
+                                </FormItem> 
                             )} />
                             <DialogFooter>
                               <DialogClose asChild><Button variant="ghost">Cancel</Button></DialogClose>

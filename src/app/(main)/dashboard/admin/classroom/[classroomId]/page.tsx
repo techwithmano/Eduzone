@@ -51,6 +51,7 @@ const assignmentSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters.").max(100, "Title cannot exceed 100 characters."),
   description: z.string().max(5000, "Description cannot exceed 5000 characters.").optional(),
   dueDate: z.date({ required_error: "A due date is required."}),
+  submissionFolderUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
 });
 
 const materialSchema = z.object({
@@ -120,7 +121,7 @@ export default function AdminClassroomPage() {
   const [teacherToRemove, setTeacherToRemove] = useState<EnrolledUser | null>(null);
 
   const announcementForm = useForm<z.infer<typeof announcementSchema>>({ resolver: zodResolver(announcementSchema), defaultValues: { content: "" } });
-  const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema), defaultValues: { title: "", description: "" } });
+  const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema), defaultValues: { title: "", description: "", submissionFolderUrl: "" } });
   const materialForm = useForm<z.infer<typeof materialSchema>>({ resolver: zodResolver(materialSchema), defaultValues: { title: "", description: "", link: "" } });
   const quizForm = useForm<z.infer<typeof quizSchema>>({ resolver: zodResolver(quizSchema), defaultValues: { title: "", description: "", questions: [] }});
   const { fields: quizQuestions, append: appendQuizQuestion, remove: removeQuizQuestion, update: updateQuizQuestion } = useFieldArray({ control: quizForm.control, name: "questions" });
@@ -142,6 +143,10 @@ export default function AdminClassroomPage() {
       if (collectionName === 'announcements') {
         dataToSave.authorId = user.uid;
         dataToSave.authorName = "Admin";
+      }
+      
+      if (collectionName === 'assignments' && !data.submissionFolderUrl) {
+        delete dataToSave.submissionFolderUrl;
       }
 
       await addDoc(collection(db, `classrooms/${classroomId}/${collectionName}`), dataToSave);
@@ -504,6 +509,14 @@ export default function AdminClassroomPage() {
                                     </Popover>
                                     <FormMessage />
                                 </FormItem>
+                            )} />
+                            <FormField control={assignmentForm.control} name="submissionFolderUrl" render={({ field }) => ( 
+                                <FormItem>
+                                    <FormLabel>Google Drive Folder Link (Optional)</FormLabel>
+                                    <FormControl><Input placeholder="https://drive.google.com/..." {...field} /></FormControl>
+                                    <FormDescription>If provided, students will be instructed to submit their work here.</FormDescription>
+                                    <FormMessage />
+                                </FormItem> 
                             )} />
                             <DialogFooter>
                               <DialogClose asChild><Button variant="ghost">Cancel</Button></DialogClose>
