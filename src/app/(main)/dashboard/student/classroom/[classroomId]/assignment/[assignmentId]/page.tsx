@@ -5,8 +5,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot, Unsubscribe, Timestamp } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase/client';
+import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,7 +35,6 @@ const SubmissionForm = ({ assignment, classroomId, assignmentId }: { assignment:
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [uploadProgress, setUploadProgress] = useState(0);
 
     const form = useForm<z.infer<typeof submissionSchema>>({
         resolver: zodResolver(submissionSchema),
@@ -45,18 +43,29 @@ const SubmissionForm = ({ assignment, classroomId, assignmentId }: { assignment:
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            if (e.target.files[0].size > 10 * 1024 * 1024) { // 10MB limit
+            const file = e.target.files[0];
+            // Enforce a 700KB limit for Data URI storage
+            if (file.size > 700 * 1024) { 
                 toast({
                 variant: 'destructive',
                 title: 'File too large',
-                description: 'Please upload a file smaller than 10MB.',
+                description: 'Please upload a file smaller than 700KB.',
                 });
                 return;
             }
-            setSelectedFile(e.target.files[0]);
+            setSelectedFile(file);
         }
     };
     
+    const fileToDataUri = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
     const onSubmit = async (values: z.infer<typeof submissionSchema>) => {
         if (!user || !assignment) return;
         if (!values.content && !selectedFile) {
@@ -65,25 +74,13 @@ const SubmissionForm = ({ assignment, classroomId, assignmentId }: { assignment:
         }
 
         setIsSubmitting(true);
-        setUploadProgress(0);
 
         try {
             let fileInfo: { fileUrl: string; fileName: string; } | undefined;
 
             if (selectedFile) {
-                const storageRef = ref(storage, `submissions/${classroomId}/${assignmentId}/${user.uid}/${selectedFile.name}`);
-                const uploadTask = uploadBytesResumable(storageRef, selectedFile);
-                
-                uploadTask.on('state_changed',
-                    (snapshot) => {
-                        setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-                    }
-                );
-                
-                await uploadTask; // Wait for upload to complete
-
-                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                fileInfo = { fileUrl: downloadURL, fileName: selectedFile.name };
+                const dataUri = await fileToDataUri(selectedFile);
+                fileInfo = { fileUrl: dataUri, fileName: selectedFile.name };
             }
 
             const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, user.uid);
@@ -102,10 +99,9 @@ const SubmissionForm = ({ assignment, classroomId, assignmentId }: { assignment:
             
         } catch (error) {
             console.error("Submission error: ", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit your work. Please check your network connection or contact support.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit your work. The file might be too large.' });
         } finally {
             setIsSubmitting(false);
-            setUploadProgress(0);
         }
     };
 
@@ -131,7 +127,7 @@ const SubmissionForm = ({ assignment, classroomId, assignmentId }: { assignment:
                             </FormItem>
                         )}/>
                         <div className="space-y-2">
-                            <FormLabel>Attach File</FormLabel>
+                            <FormLabel>Attach File (Max 700KB)</FormLabel>
                             {selectedFile && (
                             <div className="p-2 border rounded-md flex items-center justify-between text-sm bg-secondary">
                                 <div className="flex items-center gap-2 truncate">
@@ -151,7 +147,6 @@ const SubmissionForm = ({ assignment, classroomId, assignmentId }: { assignment:
                             </FormControl>
                             <Input id="file-upload" type="file" className="sr-only" onChange={handleFileChange} />
                         </div>
-                        {isSubmitting && uploadProgress > 0 && <Progress value={uploadProgress} className="w-full" />}
                         <Button type="submit" disabled={isSubmitting} className="w-full">
                             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Submit Assignment
@@ -182,7 +177,7 @@ const SubmissionReview = ({ submission }: { submission: Submission }) => {
                         {submission.content && <p className="text-muted-foreground whitespace-pre-wrap">{submission.content}</p>}
                         {submission.fileUrl && (
                             <Button asChild variant="outline">
-                                <a href={submission.fileUrl} target="_blank" rel="noopener noreferrer">
+                                <a href={submission.fileUrl} download={submission.fileName || 'submission'} rel="noopener noreferrer">
                                 <FileIcon className="mr-2 h-4 w-4" />{submission.fileName || 'View Submitted File'}
                                 </a>
                             </Button>
@@ -201,7 +196,7 @@ const SubmissionReview = ({ submission }: { submission: Submission }) => {
                             {submission.teacherFeedback && <p className="text-muted-foreground whitespace-pre-wrap">{submission.teacherFeedback}</p>}
                             {submission.teacherFeedbackFileUrl && (
                                 <Button asChild variant="secondary">
-                                    <a href={submission.teacherFeedbackFileUrl} target="_blank" rel="noopener noreferrer">
+                                    <a href={submission.teacherFeedbackFileUrl} download={submission.teacherFeedbackFileName || 'graded-file'} rel="noopener noreferrer">
                                         <Download className="mr-2 h-4 w-4" />{submission.teacherFeedbackFileName || 'Download Graded File'}
                                     </a>
                                 </Button>
