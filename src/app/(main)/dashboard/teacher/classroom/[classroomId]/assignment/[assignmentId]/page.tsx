@@ -5,8 +5,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { doc, getDoc, collection, query, orderBy, onSnapshot, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase/client';
+import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
@@ -17,7 +16,7 @@ import { type Assignment, type Classroom, type Submission } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, User, Calendar, File as FileIcon, ExternalLink, Download, Paperclip, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, User, Calendar, File as FileIcon, ExternalLink, Download, Loader2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -26,8 +25,6 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Progress } from '@/components/ui/progress';
 
 const gradeSchema = z.object({
   grade: z.number().min(0).max(100),
@@ -37,64 +34,21 @@ const gradeSchema = z.object({
 const GradeForm = ({ submission, classroomId, assignmentId }: { submission: Submission, classroomId: string, assignmentId: string }) => {
     const { toast } = useToast();
     const [isGrading, setIsGrading] = useState(false);
-    const [feedbackFile, setFeedbackFile] = useState<File | null>(null);
-    const [uploadProgress, setUploadProgress] = useState(0);
 
     const form = useForm<z.infer<typeof gradeSchema>>({
         resolver: zodResolver(gradeSchema),
-        defaultValues: { grade: 0, feedback: "" },
+        defaultValues: { grade: submission.grade || 0, feedback: submission.teacherFeedback || "" },
     });
-    
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            if (file.size > 50 * 1024 * 1024) { // 50MB limit
-                toast({ variant: 'destructive', title: 'File too large', description: 'Please upload a file smaller than 50MB.' });
-                return;
-            }
-            setFeedbackFile(file);
-        }
-    };
 
     const handleGradeSubmit = async (values: z.infer<typeof gradeSchema>) => {
         setIsGrading(true);
-        setUploadProgress(0);
-
-        let feedbackFileUrl: string | undefined;
-        let feedbackFileName: string | undefined;
-
         try {
-            if (feedbackFile) {
-                const storageRef = ref(storage, `graded-submissions/${classroomId}/${assignmentId}/${submission.id}/${feedbackFile.name}`);
-                const uploadTask = uploadBytesResumable(storageRef, feedbackFile);
-
-                await new Promise<void>((resolve, reject) => {
-                    uploadTask.on(
-                        'state_changed',
-                        (snapshot) => {
-                            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                            setUploadProgress(progress);
-                        },
-                        (error) => {
-                            console.error("Upload error:", error);
-                            reject(error);
-                        },
-                        async () => {
-                            feedbackFileUrl = await getDownloadURL(uploadTask.snapshot.ref);
-                            feedbackFileName = feedbackFile.name;
-                            resolve();
-                        }
-                    );
-                });
-            }
-            
             const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, submission.id);
             await updateDoc(submissionDocRef, {
                 status: 'graded',
                 grade: values.grade,
                 teacherFeedback: values.feedback,
                 gradedAt: serverTimestamp(),
-                ...(feedbackFileUrl && { teacherFeedbackFileUrl: feedbackFileUrl, teacherFeedbackFileName: feedbackFileName }),
             });
             toast({ title: 'Success!', description: `Grade has been returned to ${submission.studentName}.` });
         } catch (error) {
@@ -109,27 +63,13 @@ const GradeForm = ({ submission, classroomId, assignmentId }: { submission: Subm
         <form onSubmit={form.handleSubmit(handleGradeSubmit)} className="space-y-6 pt-4">
             <div className="space-y-2">
                 <Label htmlFor="grade">Grade: {form.watch('grade')}/100</Label>
-                <Slider id="grade" min={0} max={100} step={1} defaultValue={[0]} onValueChange={(val) => form.setValue('grade', val[0])}/>
+                <Slider id="grade" min={0} max={100} step={1} defaultValue={[form.getValues('grade')]} onValueChange={(val) => form.setValue('grade', val[0])}/>
             </div>
             
             <div className="space-y-2">
                 <Label htmlFor="feedback">Feedback</Label>
                 <Textarea id="feedback" placeholder="Provide detailed feedback..." {...form.register('feedback')} className="min-h-[100px]" />
             </div>
-
-            <div className="space-y-2">
-                <Label>Return Graded File (Optional, Max 50MB)</Label>
-                {feedbackFile && (
-                    <div className="p-2 border rounded-md flex items-center justify-between text-sm bg-secondary">
-                        <div className="flex items-center gap-2 truncate"><FileIcon className="h-4 w-4 shrink-0" /><span className="truncate">{feedbackFile.name}</span></div>
-                        <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setFeedbackFile(null)}><X className="h-4 w-4" /></Button>
-                    </div>
-                )}
-                <Button type="button" variant="outline" asChild><label htmlFor="feedback-file" className="w-full cursor-pointer"><Paperclip className="mr-2 h-4 w-4" />{feedbackFile ? 'Replace File' : 'Attach File'}</label></Button>
-                <Input id="feedback-file" type="file" className="sr-only" onChange={handleFileChange} />
-            </div>
-
-            {isGrading && feedbackFile && <Progress value={uploadProgress} className="w-full" />}
 
             <Button type="submit" disabled={isGrading} className="w-full">
                 {isGrading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -287,7 +227,6 @@ export default function TeacherAssignmentPage() {
                                                                 <h4 className="font-semibold text-lg">Grade & Feedback</h4>
                                                                 <p className="text-2xl font-bold">{submission.grade}/100</p>
                                                                 {submission.teacherFeedback && <p className="text-muted-foreground text-sm whitespace-pre-wrap">{submission.teacherFeedback}</p>}
-                                                                {submission.teacherFeedbackFileUrl && <Button asChild variant="secondary"><a href={submission.teacherFeedbackFileUrl} target="_blank" download={submission.teacherFeedbackFileName || 'graded-file'} rel="noopener noreferrer"><Download className="mr-2 h-4 w-4" />{submission.teacherFeedbackFileName || 'Download Graded File'}</a></Button>}
                                                             </div>
                                                         ) : (
                                                             <GradeForm submission={submission} classroomId={classroomId} assignmentId={assignmentId}/>

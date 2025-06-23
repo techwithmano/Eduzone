@@ -73,8 +73,6 @@ export type Submission = {
   grade?: number; // e.g., 85
   teacherFeedback?: string;
   gradedAt?: Timestamp;
-  teacherFeedbackFileUrl?: string;
-  teacherFeedbackFileName?: string;
 };
 
 export type Material = {
