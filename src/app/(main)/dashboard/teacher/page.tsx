@@ -35,7 +35,7 @@ export default function TeacherDashboardPage() {
     }
 
     setLoading(true);
-    // This query is now fixed: removed the invalid `orderBy` clause.
+    // This query is now fixed: removed the invalid `orderBy` clause that Firestore doesn't support with 'array-contains'.
     const classroomQuery = query(
         collection(db, "classrooms"), 
         where("teacherIds", "array-contains", user.uid)
@@ -43,12 +43,15 @@ export default function TeacherDashboardPage() {
 
     const unsubscribe = onSnapshot(classroomQuery, (querySnapshot) => {
         const assignedClassrooms = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Classroom[];
-        // Manual sort on the client-side
-        assignedClassrooms.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+        // Manual sort on the client-side to order by most recent
+        if(assignedClassrooms.length > 0 && assignedClassrooms[0].createdAt) {
+          assignedClassrooms.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+        }
         setClassrooms(assignedClassrooms);
         setLoading(false);
     }, (error) => {
-        toast({ variant: "destructive", title: "Error fetching classrooms" });
+        console.error("Error fetching classrooms: ", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not fetch assigned classrooms." });
         setLoading(false);
     });
 

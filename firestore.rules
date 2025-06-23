@@ -4,103 +4,104 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ---- HELPER FUNCTIONS ---- //
-    
+    // HELPER FUNCTIONS
     function isAuth() {
       return request.auth != null;
     }
 
+    function isUser(userId) {
+      return isAuth() && request.auth.uid == userId;
+    }
+
     function getUserData(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data;
+        return get(/databases/$(database)/documents/users/$(userId)).data;
+    }
+    
+    function isAdmin() {
+        return isAuth() && getUserData(request.auth.uid).role == 'ADMIN';
     }
 
-    function isRole(userId, role) {
-      return isAuth() && getUserData(userId).role == role;
+    function isClassroomCreator(classroomId) {
+      let classroom = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
+      return isAuth() && request.auth.uid == classroom.creatorId;
     }
 
-    function isRequestingUserAdmin() {
-      return isRole(request.auth.uid, 'ADMIN');
+    function isClassroomTeacher(classroomId) {
+      let classroom = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
+      // Defensively check for key existence before accessing
+      return isAuth() && 'teacherIds' in classroom && request.auth.uid in classroom.teacherIds;
     }
-
-    // For checking single document GET requests
+    
+    function isEnrolledStudent(classroomId) {
+        let classroom = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
+        // Defensively check for key existence before accessing
+        return isAuth() && 'enrolledStudentIds' in classroom && request.auth.uid in classroom.enrolledStudentIds;
+    }
+    
     function isClassroomMember(classroomId) {
-      let classroomData = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
-      // Check for null to prevent errors on non-existent docs
-      if (classroomData == null) { return false; }
-      
-      let isCreator = request.auth.uid == classroomData.creatorId;
-      // Defensively check if array fields exist before checking membership
-      let isTeacher = 'teacherIds' in classroomData && request.auth.uid in classroomData.teacherIds;
-      let isStudent = 'enrolledStudentIds' in classroomData && request.auth.uid in classroomData.enrolledStudentIds;
-      
-      return isCreator || isTeacher || isStudent;
+        return isClassroomCreator(classroomId) || isClassroomTeacher(classroomId) || isEnrolledStudent(classroomId);
     }
-
-    // For checking write permissions within a classroom
-    function isClassroomAdminOrTeacher(classroomId) {
-      let classroomData = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
-      if (classroomData == null) { return false; }
-
-      let isCreator = request.auth.uid == classroomData.creatorId;
-      let isTeacher = 'teacherIds' in classroomData && request.auth.uid in classroomData.teacherIds;
-      
-      return isCreator || isTeacher;
-    }
-
-    // ---- COLLECTION RULES ---- //
-
+    
+    // COLLECTIONS
+    
     // User Profiles
     match /users/{userId} {
       allow read: if isAuth();
-      allow create: if request.auth.uid == userId;
-      // Admins can update any user profile (for classroom deletion cleanup)
-      allow update: if request.auth.uid == userId || isRequestingUserAdmin();
-      allow delete: if false; // Users are never deleted
+      allow create: if isUser(userId);
+      // User can update their own profile, or an Admin can update anyone's profile.
+      allow update: if isUser(userId) || isAdmin();
+      allow delete: if false; 
     }
 
-    // Classrooms
-    match /classrooms/{classroomId} {
-      // GET: Strict check for membership for single document reads
-      allow get: if isAuth() && isClassroomMember(classroomId);
-      // LIST: Allow authenticated users to query. The client-side queries *must* be correct.
-      // This is safe because all dashboard queries are constrained by user ID.
-      allow list: if isAuth();
-      
-      // WRITE: Admins can create/update/delete their own classrooms.
-      allow create: if isRequestingUserAdmin() && request.resource.data.creatorId == request.auth.uid;
-      allow update: if isRequestingUserAdmin() && resource.data.creatorId == request.auth.uid;
-      allow delete: if isRequestingUserAdmin() && resource.data.creatorId == request.auth.uid;
-
-      // Classroom Subcollections (Announcements, Assignments, etc.)
-      match /{subcollection}/{docId} {
-        allow read: if isAuth() && isClassroomMember(classroomId);
-        allow write: if isAuth() && isClassroomAdminOrTeacher(classroomId);
-
-        // Submissions (nested even deeper)
-        match /submissions/{studentId} {
-          // Admin/Teacher can read any submission. Student can only read their own.
-          allow read: if (isAuth() && isClassroomAdminOrTeacher(classroomId)) || (isAuth() && request.auth.uid == studentId);
-          // Student can create their own submission, but not overwrite an existing one.
-          allow create: if isAuth() && request.auth.uid == studentId;
-          // Admin/Teacher can update (grade).
-          allow update: if isAuth() && isClassroomAdminOrTeacher(classroomId);
-          // Admin/Teacher can delete (needed for assignment/quiz cleanup).
-          allow delete: if isAuth() && isClassroomAdminOrTeacher(classroomId);
-        }
-      }
-    }
-    
-    // Publicly accessible store products
+    // Products for the store
     match /products/{productId} {
       allow read: if true;
-      allow write: if isRequestingUserAdmin();
+      allow create, update, delete: if isAdmin();
     }
     
     // Contact form submissions
     match /contacts/{contactId} {
-      allow read: if false;
+      allow read, update, delete: if false;
       allow create: if true;
-      allow write: if false;
+    }
+
+    // Classrooms and all nested content
+    match /classrooms/{classroomId} {
+      // Rules for reading a single document
+      allow get: if isClassroomMember(classroomId);
+      
+      // Rules for querying a list of documents. Must be broad to allow client-side queries.
+      // The queries themselves filter the data securely.
+      allow list: if isAuth();
+
+      allow create: if isAdmin();
+      allow update, delete: if isClassroomCreator(classroomId);
+
+      // Announcements, Assignments, Materials, Quizzes
+      match /{subCollection}/{docId}
+        where subCollection in ['announcements', 'assignments', 'materials', 'quizzes'] {
+        
+        allow read: if isClassroomMember(classroomId);
+        allow create, update, delete: if isClassroomCreator(classroomId) || isClassroomTeacher(classroomId);
+      }
+      
+      // Assignment Submissions
+      match /assignments/{assignmentId}/submissions/{studentId} {
+        allow get: if isClassroomCreator(classroomId) || isClassroomTeacher(classroomId) || isUser(studentId);
+        allow list: if isClassroomCreator(classroomId) || isClassroomTeacher(classroomId);
+        allow create: if isUser(studentId) && !exists(/databases/$(database)/documents/classrooms/$(classroomId)/assignments/$(assignmentId)/submissions/$(studentId));
+        allow update: if isClassroomCreator(classroomId) || isClassroomTeacher(classroomId); // For grading
+        allow delete: if isClassroomCreator(classroomId) || isClassroomTeacher(classroomId);
+      }
+      
+      // Quiz Submissions
+      match /quizzes/{quizId}/submissions/{studentId} {
+        allow get: if isClassroomCreator(classroomId) || isClassroomTeacher(classroomId) || isUser(studentId);
+        allow list: if isClassroomCreator(classroomId) || isClassroomTeacher(classroomId);
+        allow create: if isUser(studentId) && !exists(/databases/$(database)/documents/classrooms/$(classroomId)/quizzes/$(quizId)/submissions/$(studentId));
+        allow update: if isClassroomCreator(classroomId) || isClassroomTeacher(classroomId); // For grading
+        allow delete: if isClassroomCreator(classroomId) || isClassroomTeacher(classroomId);
+      }
     }
   }
 }
