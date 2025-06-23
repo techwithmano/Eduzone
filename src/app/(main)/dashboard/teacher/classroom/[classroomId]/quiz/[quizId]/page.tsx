@@ -33,14 +33,20 @@ const QuizReviewAndGrade = ({ quiz, submission, onGrade }: { quiz: Quiz, submiss
     const handleGradeChange = (qIndex: number, isCorrect: boolean) => {
         setManualGrades(prev => ({
             ...prev,
-            [qIndex]: { ...prev[qIndex], isCorrect }
+            [qIndex]: { 
+                isCorrect: isCorrect, 
+                teacherFeedback: prev[qIndex]?.teacherFeedback || '' 
+            }
         }));
     };
     
     const handleFeedbackChange = (qIndex: number, feedback: string) => {
         setManualGrades(prev => ({
             ...prev,
-            [qIndex]: { ...prev[qIndex], teacherFeedback: feedback }
+            [qIndex]: { 
+                teacherFeedback: feedback, 
+                isCorrect: prev[qIndex]?.isCorrect ?? false 
+            }
         }));
     };
 
@@ -92,9 +98,9 @@ const QuizReviewAndGrade = ({ quiz, submission, onGrade }: { quiz: Quiz, submiss
                                             <p className="text-muted-foreground p-3 bg-secondary rounded-md whitespace-pre-wrap">{String(answer.studentAnswer)}</p>
                                         </div>
 
-                                        {isGradingMode ? (
+                                        {isGradingMode && question.type === 'typed-answer' ? (
                                             <div className="p-3 border rounded-md bg-background space-y-3">
-                                                <RadioGroup onValueChange={(val) => handleGradeChange(qIndex, val === 'correct')}>
+                                                <RadioGroup onValueChange={(val) => handleGradeChange(qIndex, val === 'correct')} defaultValue={manualGrades[qIndex]?.isCorrect ? 'correct' : 'incorrect'}>
                                                     <div className="flex items-center space-x-4">
                                                         <div className="flex items-center space-x-2">
                                                             <RadioGroupItem value="correct" id={`grade-${qIndex}-correct`} />
@@ -106,7 +112,7 @@ const QuizReviewAndGrade = ({ quiz, submission, onGrade }: { quiz: Quiz, submiss
                                                         </div>
                                                     </div>
                                                 </RadioGroup>
-                                                <Textarea placeholder="Provide feedback (optional)" onChange={(e) => handleFeedbackChange(qIndex, e.target.value)} />
+                                                <Textarea placeholder="Provide feedback (optional)" onChange={(e) => handleFeedbackChange(qIndex, e.target.value)} defaultValue={manualGrades[qIndex]?.teacherFeedback} />
                                             </div>
                                         ) : submission.status !== 'pending-review' && (
                                             <div className="p-3 rounded-md border">
@@ -204,11 +210,27 @@ export default function TeacherQuizResultsPage() {
     if (!quiz) return;
     try {
         let manuallyCorrectedCount = 0;
+
+        const typedQuestionsInQuiz = quiz.questions.map((q, i) => ({...q, originalIndex: i})).filter(q => q.type === 'typed-answer');
+        const gradedTypedQuestions = Object.keys(grades);
+
+        if(gradedTypedQuestions.length < typedQuestionsInQuiz.length) {
+            toast({
+                variant: 'destructive',
+                title: "Incomplete Grading",
+                description: "Please grade all typed-answer questions before saving."
+            });
+            return;
+        }
+
         const newAnswers = submission.answers.map((answer, index) => {
-            if (answer.questionType === 'typed-answer' && grades[index]) {
-                const gradedAnswer = { ...answer, ...grades[index] };
-                if (gradedAnswer.isCorrect) manuallyCorrectedCount++;
-                return gradedAnswer;
+            if (answer.questionType === 'typed-answer') {
+                const gradeInfo = grades[index];
+                 if (gradeInfo) {
+                    const gradedAnswer = { ...answer, ...gradeInfo };
+                    if (gradedAnswer.isCorrect) manuallyCorrectedCount++;
+                    return gradedAnswer;
+                }
             }
             return answer;
         });
