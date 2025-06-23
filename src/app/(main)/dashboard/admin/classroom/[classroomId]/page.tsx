@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useEffect, useState, useCallback } from 'react';
@@ -583,13 +584,27 @@ export default function AdminClassroomPage() {
                                                       control={quizForm.control}
                                                       name={`questions.${index}.type`}
                                                       render={({ field: selectField }) => (
-                                                        <Select onValueChange={(value) => {
-                                                            selectField.onChange(value)
-                                                            updateQuizQuestion(index, {
-                                                                ...field,
-                                                                type: value as 'multiple-choice' | 'typed-answer',
-                                                            })
-                                                        }} value={selectField.value}>
+                                                        <Select
+                                                          onValueChange={(value) => {
+                                                            selectField.onChange(value);
+                                                            if (value === 'multiple-choice') {
+                                                              updateQuizQuestion(index, {
+                                                                id: field.id,
+                                                                question: field.question,
+                                                                type: 'multiple-choice',
+                                                                options: ['', '', '', ''],
+                                                                correctAnswer: 0,
+                                                              });
+                                                            } else if (value === 'typed-answer') {
+                                                              updateQuizQuestion(index, {
+                                                                id: field.id,
+                                                                question: field.question,
+                                                                type: 'typed-answer',
+                                                              });
+                                                            }
+                                                          }}
+                                                          value={selectField.value}
+                                                        >
                                                             <FormControl><SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger></FormControl>
                                                             <SelectContent>
                                                                 <SelectItem value="multiple-choice">Multiple Choice</SelectItem>

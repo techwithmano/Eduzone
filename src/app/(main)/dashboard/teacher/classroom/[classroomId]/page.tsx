@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -100,7 +101,7 @@ export default function TeacherClassroomPage() {
   const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema), defaultValues: { title: "", description: "", submissionFolderUrl: "" } });
   const materialForm = useForm<z.infer<typeof materialSchema>>({ resolver: zodResolver(materialSchema), defaultValues: { title: "", description: "", link: "" } });
   const quizForm = useForm<z.infer<typeof quizSchema>>({ resolver: zodResolver(quizSchema), defaultValues: { title: "", description: "", questions: [] }});
-  const { fields: quizQuestions, append: appendQuizQuestion, remove: removeQuizQuestion } = useFieldArray({ control: quizForm.control, name: "questions" });
+  const { fields: quizQuestions, append: appendQuizQuestion, remove: removeQuizQuestion, update: updateQuizQuestion } = useFieldArray({ control: quizForm.control, name: "questions" });
 
   const simpleCreate = (collectionName: string) => async (data: any) => {
     if (!user) return;
@@ -381,7 +382,27 @@ export default function TeacherClassroomPage() {
                                                       control={quizForm.control}
                                                       name={`questions.${index}.type`}
                                                       render={({ field: selectField }) => (
-                                                        <Select onValueChange={selectField.onChange} value={selectField.value}>
+                                                        <Select
+                                                          onValueChange={(value) => {
+                                                            selectField.onChange(value);
+                                                            if (value === 'multiple-choice') {
+                                                              updateQuizQuestion(index, {
+                                                                id: field.id,
+                                                                question: field.question,
+                                                                type: 'multiple-choice',
+                                                                options: ['', '', '', ''],
+                                                                correctAnswer: 0,
+                                                              });
+                                                            } else if (value === 'typed-answer') {
+                                                              updateQuizQuestion(index, {
+                                                                id: field.id,
+                                                                question: field.question,
+                                                                type: 'typed-answer',
+                                                              });
+                                                            }
+                                                          }}
+                                                          value={selectField.value}
+                                                        >
                                                             <FormControl><SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger></FormControl>
                                                             <SelectContent>
                                                                 <SelectItem value="multiple-choice">Multiple Choice</SelectItem>
