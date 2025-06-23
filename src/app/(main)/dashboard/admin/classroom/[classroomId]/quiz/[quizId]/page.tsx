@@ -30,6 +30,21 @@ const QuizReviewAndGrade = ({ quiz, submission, onGrade }: { quiz: Quiz, submiss
     const isGradingMode = onGrade !== undefined && submission.status === 'pending-review';
     const [manualGrades, setManualGrades] = useState<ManualGradeState>({});
 
+    useEffect(() => {
+        if (isGradingMode) {
+            const initialGrades: ManualGradeState = {};
+            quiz.questions.forEach((question, qIndex) => {
+                const answer = submission.answers[qIndex];
+                if (answer.questionType === 'typed-answer') {
+                    // Initialize with a default state: incorrect and no feedback
+                    initialGrades[qIndex] = { isCorrect: false, teacherFeedback: '' };
+                }
+            });
+            setManualGrades(initialGrades);
+        }
+    }, [isGradingMode, quiz.questions, submission.answers]);
+
+
     const handleGradeChange = (qIndex: number, isCorrect: boolean) => {
         setManualGrades(prev => ({
             ...prev,
@@ -100,7 +115,7 @@ const QuizReviewAndGrade = ({ quiz, submission, onGrade }: { quiz: Quiz, submiss
 
                                         {isGradingMode && question.type === 'typed-answer' ? (
                                             <div className="p-3 border rounded-md bg-background space-y-3">
-                                                <RadioGroup onValueChange={(val) => handleGradeChange(qIndex, val === 'correct')} defaultValue={manualGrades[qIndex]?.isCorrect ? 'correct' : 'incorrect'}>
+                                                <RadioGroup onValueChange={(val) => handleGradeChange(qIndex, val === 'correct')} value={manualGrades[qIndex]?.isCorrect ? 'correct' : 'incorrect'}>
                                                     <div className="flex items-center space-x-4">
                                                         <div className="flex items-center space-x-2">
                                                             <RadioGroupItem value="correct" id={`grade-${qIndex}-correct`} />
@@ -112,7 +127,7 @@ const QuizReviewAndGrade = ({ quiz, submission, onGrade }: { quiz: Quiz, submiss
                                                         </div>
                                                     </div>
                                                 </RadioGroup>
-                                                <Textarea placeholder="Provide feedback (optional)" onChange={(e) => handleFeedbackChange(qIndex, e.target.value)} defaultValue={manualGrades[qIndex]?.teacherFeedback} />
+                                                <Textarea placeholder="Provide feedback (optional)" onChange={(e) => handleFeedbackChange(qIndex, e.target.value)} value={manualGrades[qIndex]?.teacherFeedback} />
                                             </div>
                                         ) : submission.status !== 'pending-review' && (
                                             <div className="p-3 rounded-md border">
@@ -201,23 +216,11 @@ export default function AdminQuizResultsPage() {
     if (!quiz) return;
     try {
         let manuallyCorrectedCount = 0;
-        
-        const typedQuestionsInQuiz = quiz.questions.map((q, i) => ({...q, originalIndex: i})).filter(q => q.type === 'typed-answer');
-        const gradedTypedQuestions = Object.keys(grades);
-
-        if(gradedTypedQuestions.length < typedQuestionsInQuiz.length) {
-            toast({
-                variant: 'destructive',
-                title: "Incomplete Grading",
-                description: "Please grade all typed-answer questions before saving."
-            });
-            return;
-        }
 
         const newAnswers = submission.answers.map((answer, index) => {
             if (answer.questionType === 'typed-answer') {
                 const gradeInfo = grades[index];
-                 if (gradeInfo) {
+                if (gradeInfo) {
                     const gradedAnswer = { ...answer, ...gradeInfo };
                     if (gradedAnswer.isCorrect) manuallyCorrectedCount++;
                     return gradedAnswer;
