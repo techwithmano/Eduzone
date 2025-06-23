@@ -1,107 +1,119 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // HELPER FUNCTIONS
+    // --- Helper Functions ---
+
+    // Checks if a user is authenticated.
     function isAuth() {
       return request.auth != null;
     }
 
-    function isUser(userId) {
-      return isAuth() && request.auth.uid == userId;
+    // Gets the role of the currently authenticated user.
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
-    function getUserData(userId) {
-        return get(/databases/$(database)/documents/users/$(userId)).data;
-    }
-    
+    // Checks if the current user is an Admin.
     function isAdmin() {
-        return isAuth() && getUserData(request.auth.uid).role == 'ADMIN';
+      return isAuth() && getUserRole() == 'ADMIN';
     }
 
+    // Checks if the current user created a specific classroom.
     function isClassroomCreator(classroomId) {
       let classroom = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
       return isAuth() && request.auth.uid == classroom.creatorId;
     }
 
-    function isClassroomTeacher(classroomId) {
+    // Checks if the current user is an assigned teacher for a specific classroom.
+    function isTeacher(classroomId) {
       let classroom = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
-      // Defensively check for key existence before accessing
-      return isAuth() && 'teacherIds' in classroom && request.auth.uid in classroom.teacherIds;
+      return isAuth() && request.auth.uid in classroom.teacherIds;
+    }
+
+    // Checks if the current user is an enrolled student in a specific classroom.
+    function isStudent(classroomId) {
+      let classroom = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
+      return isAuth() && request.auth.uid in classroom.enrolledStudentIds;
     }
     
-    function isEnrolledStudent(classroomId) {
-        let classroom = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
-        // Defensively check for key existence before accessing
-        return isAuth() && 'enrolledStudentIds' in classroom && request.auth.uid in classroom.enrolledStudentIds;
-    }
-    
-    function isClassroomMember(classroomId) {
-        return isClassroomCreator(classroomId) || isClassroomTeacher(classroomId) || isEnrolledStudent(classroomId);
-    }
-    
-    // COLLECTIONS
-    
-    // User Profiles
+    // --- Collection: users ---
     match /users/{userId} {
       allow read: if isAuth();
-      allow create: if isUser(userId);
-      // User can update their own profile, or an Admin can update anyone's profile.
-      allow update: if isUser(userId) || isAdmin();
-      allow delete: if false; 
+      allow create: if request.auth.uid == userId;
+      allow update: if request.auth.uid == userId || isAdmin();
+      allow delete: if isAdmin();
     }
 
-    // Products for the store
-    match /products/{productId} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
-    }
-    
-    // Contact form submissions
-    match /contacts/{contactId} {
-      allow read, update, delete: if false;
-      allow create: if true;
-    }
-
-    // Classrooms and all nested content
+    // --- Collection: classrooms ---
     match /classrooms/{classroomId} {
-      // Rules for reading a single document
-      allow get: if isClassroomMember(classroomId);
+      // To GET a single classroom document, you must be a member.
+      allow get: if isAuth() && (isClassroomCreator(classroomId) || isTeacher(classroomId) || isStudent(classroomId));
       
-      // Rules for querying a list of documents. Must be broad to allow client-side queries.
-      // The queries themselves filter the data securely.
+      // To LIST classrooms, you must be authenticated. The client query must filter the results.
+      // This is the key fix for the dashboard visibility issues.
       allow list: if isAuth();
-
+      
+      // Only Admins can create classrooms.
       allow create: if isAdmin();
+      
+      // Only the classroom creator (Admin) can update or delete the classroom document itself.
       allow update, delete: if isClassroomCreator(classroomId);
 
-      // Announcements, Assignments, Materials, Quizzes
-      match /{subCollection}/{docId}
-        where subCollection in ['announcements', 'assignments', 'materials', 'quizzes'] {
+      // --- Subcollection: announcements ---
+      match /announcements/{announcementId} {
+        allow read: if isClassroomCreator(classroomId) || isTeacher(classroomId) || isStudent(classroomId);
+        allow write: if isClassroomCreator(classroomId) || isTeacher(classroomId);
+      }
+
+      // --- Subcollection: materials ---
+      match /materials/{materialId} {
+        allow read: if isClassroomCreator(classroomId) || isTeacher(classroomId) || isStudent(classroomId);
+        allow write: if isClassroomCreator(classroomId) || isTeacher(classroomId);
+      }
+
+      // --- Subcollection: assignments ---
+      match /assignments/{assignmentId} {
+        allow read: if isClassroomCreator(classroomId) || isTeacher(classroomId) || isStudent(classroomId);
+        allow write: if isClassroomCreator(classroomId) || isTeacher(classroomId);
         
-        allow read: if isClassroomMember(classroomId);
-        allow create, update, delete: if isClassroomCreator(classroomId) || isClassroomTeacher(classroomId);
+        // --- Nested Subcollection: assignment submissions ---
+        match /submissions/{studentId} {
+          allow get: if (isClassroomCreator(classroomId) || isTeacher(classroomId)) || request.auth.uid == studentId;
+          allow list: if isClassroomCreator(classroomId) || isTeacher(classroomId);
+          allow create: if request.auth.uid == studentId && !exists(path);
+          allow update: if isClassroomCreator(classroomId) || isTeacher(classroomId); // For grading
+          allow delete: if isClassroomCreator(classroomId) || isTeacher(classroomId);
+        }
       }
-      
-      // Assignment Submissions
-      match /assignments/{assignmentId}/submissions/{studentId} {
-        allow get: if isClassroomCreator(classroomId) || isClassroomTeacher(classroomId) || isUser(studentId);
-        allow list: if isClassroomCreator(classroomId) || isClassroomTeacher(classroomId);
-        allow create: if isUser(studentId) && !exists(/databases/$(database)/documents/classrooms/$(classroomId)/assignments/$(assignmentId)/submissions/$(studentId));
-        allow update: if isClassroomCreator(classroomId) || isClassroomTeacher(classroomId); // For grading
-        allow delete: if isClassroomCreator(classroomId) || isClassroomTeacher(classroomId);
+
+      // --- Subcollection: quizzes ---
+      match /quizzes/{quizId} {
+        allow read: if isClassroomCreator(classroomId) || isTeacher(classroomId) || isStudent(classroomId);
+        allow write: if isClassroomCreator(classroomId) || isTeacher(classroomId);
+        
+        // --- Nested Subcollection: quiz submissions ---
+        match /submissions/{studentId} {
+          allow get: if (isClassroomCreator(classroomId) || isTeacher(classroomId)) || request.auth.uid == studentId;
+          allow list: if isClassroomCreator(classroomId) || isTeacher(classroomId);
+          allow create: if request.auth.uid == studentId && !exists(path);
+          allow update: if isClassroomCreator(classroomId) || isTeacher(classroomId); // For manual grading
+          allow delete: if isClassroomCreator(classroomId) || isTeacher(classroomId);
+        }
       }
-      
-      // Quiz Submissions
-      match /quizzes/{quizId}/submissions/{studentId} {
-        allow get: if isClassroomCreator(classroomId) || isClassroomTeacher(classroomId) || isUser(studentId);
-        allow list: if isClassroomCreator(classroomId) || isClassroomTeacher(classroomId);
-        allow create: if isUser(studentId) && !exists(/databases/$(database)/documents/classrooms/$(classroomId)/quizzes/$(quizId)/submissions/$(studentId));
-        allow update: if isClassroomCreator(classroomId) || isClassroomTeacher(classroomId); // For grading
-        allow delete: if isClassroomCreator(classroomId) || isClassroomTeacher(classroomId);
-      }
+    }
+
+    // --- Collection: products ---
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // --- Collection: contacts ---
+    match /contacts/{contactId} {
+      allow create: if true;
+      allow read, update, delete: if false;
     }
   }
 }
