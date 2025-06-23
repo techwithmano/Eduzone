@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot, Unsubscribe } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,13 +17,15 @@ import { type Assignment, type Submission } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, CheckCircle, Loader2, History } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Loader2, History, Paperclip, File as FileIcon, X } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 
 const submissionSchema = z.object({
-  content: z.string().min(10, "Submission must be at least 10 characters long.").max(5000, "Submission cannot exceed 5000 characters."),
+  content: z.string().max(5000, "Submission text cannot exceed 5000 characters.").optional(),
 });
 
 export default function StudentAssignmentPage() {
@@ -38,6 +41,8 @@ export default function StudentAssignmentPage() {
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const form = useForm<z.infer<typeof submissionSchema>>({
     resolver: zodResolver(submissionSchema),
@@ -81,9 +86,7 @@ export default function StudentAssignmentPage() {
         if (submissionDoc.exists()) {
             const subData = { id: submissionDoc.id, ...submissionDoc.data() } as Submission;
             setSubmission(subData);
-            if(form.getValues('content') !== subData.content) {
-              form.reset({ content: subData.content });
-            }
+            form.reset({ content: subData.content || "" });
         } else {
             setSubmission(null);
         }
@@ -95,30 +98,96 @@ export default function StudentAssignmentPage() {
 
   }, [classroomId, assignmentId, user, toast, form]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      if (e.target.files[0].size > 10 * 1024 * 1024) { // 10MB limit
+        toast({
+          variant: 'destructive',
+          title: 'File too large',
+          description: 'Please upload a file smaller than 10MB.',
+        });
+        return;
+      }
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
   const onSubmit = async (values: z.infer<typeof submissionSchema>) => {
     if (!user || !assignment) return;
+    
+    // Check if there's any content to submit
+    if (!values.content && !selectedFile && !submission?.fileUrl) {
+      toast({
+        variant: 'destructive',
+        title: 'Empty Submission',
+        description: 'Please write a message or upload a file to submit.',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
+    setUploadProgress(0);
+
     try {
+        let fileInfo: { fileUrl: string; fileName: string; fileType: string; } | {} = {};
+
+        if (selectedFile) {
+            const storageRef = ref(storage, `submissions/${classroomId}/${assignmentId}/${user.uid}/${selectedFile.name}`);
+            const uploadTask = uploadBytesResumable(storageRef, selectedFile);
+            
+            await new Promise<void>((resolve, reject) => {
+                uploadTask.on('state_changed',
+                    (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        setUploadProgress(progress);
+                    },
+                    (error) => {
+                        console.error("Upload failed", error);
+                        reject(error);
+                    },
+                    async () => {
+                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                        fileInfo = {
+                            fileUrl: downloadURL,
+                            fileName: selectedFile.name,
+                            fileType: selectedFile.type,
+                        };
+                        resolve();
+                    }
+                );
+            });
+        }
+
         const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, user.uid);
         
-        const submissionData: Omit<Submission, 'id'> = {
+        const submissionData: any = {
             studentId: user.uid,
             studentName: user.displayName || 'Anonymous Student',
-            content: values.content,
-            submittedAt: serverTimestamp() as any,
+            submittedAt: submission?.submittedAt || serverTimestamp(), // Preserve original submission time
+            resubmittedAt: serverTimestamp(),
         };
 
-        if(submission) {
-            submissionData.resubmittedAt = serverTimestamp() as any;
+        if (values.content) {
+            submissionData.content = values.content;
+        } else {
+             submissionData.content = submission?.content || null; // keep old content if new is empty
+        }
+
+        if (Object.keys(fileInfo).length > 0) {
+          submissionData.fileUrl = (fileInfo as any).fileUrl;
+          submissionData.fileName = (fileInfo as any).fileName;
+          submissionData.fileType = (fileInfo as any).fileType;
         }
 
         await setDoc(submissionDocRef, submissionData, { merge: true });
         
         toast({ title: 'Success!', description: `Your work for "${assignment.title}" has been submitted.` });
+        setSelectedFile(null); // Clear selected file after submission
     } catch (error) {
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit your work.' });
     } finally {
         setIsSubmitting(false);
+        setUploadProgress(0);
     }
   };
 
@@ -181,7 +250,7 @@ export default function StudentAssignmentPage() {
                         Your Work
                     </CardTitle>
                     <CardDescription>
-                       {submission ? 'You have submitted your work.' : 'Submit your work here. You can paste text or a link to a file.'}
+                       {submission ? 'You have submitted your work. You can resubmit if needed.' : 'Submit your work here.'}
                        {submission?.submittedAt && (
                          <span className="text-xs block mt-1">
                            Last submitted: {format(submission.submittedAt.toDate(), 'PPP p')}
@@ -197,11 +266,11 @@ export default function StudentAssignmentPage() {
                                 name="content"
                                 render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="sr-only">Your Submission</FormLabel>
+                                    <FormLabel>Your Response</FormLabel>
                                     <FormControl>
                                     <Textarea
-                                        placeholder="Type your response or paste a link here..."
-                                        className="min-h-[200px]"
+                                        placeholder="Type a message or response here..."
+                                        className="min-h-[150px]"
                                         {...field}
                                     />
                                     </FormControl>
@@ -209,6 +278,41 @@ export default function StudentAssignmentPage() {
                                 </FormItem>
                                 )}
                             />
+                            
+                            <div className="space-y-2">
+                              <FormLabel>Attach File</FormLabel>
+                               {submission?.fileUrl && !selectedFile && (
+                                <div className="p-2 border rounded-md flex items-center justify-between text-sm bg-secondary">
+                                  <a href={submission.fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 truncate text-primary hover:underline">
+                                    <FileIcon className="h-4 w-4 shrink-0" />
+                                    <span className="truncate font-medium">{submission.fileName}</span>
+                                  </a>
+                                </div>
+                              )}
+                              {selectedFile && (
+                                <div className="p-2 border rounded-md flex items-center justify-between text-sm bg-secondary">
+                                  <div className="flex items-center gap-2 truncate">
+                                    <FileIcon className="h-4 w-4 shrink-0" />
+                                    <span className="truncate">{selectedFile.name}</span>
+                                  </div>
+                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSelectedFile(null)}>
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              )}
+                              <FormControl>
+                                <Button type="button" variant="outline" asChild>
+                                  <label htmlFor="file-upload" className="w-full cursor-pointer">
+                                    <Paperclip className="mr-2 h-4 w-4" />
+                                    {submission?.fileUrl || selectedFile ? 'Replace File' : 'Choose File'}
+                                  </label>
+                                </Button>
+                              </FormControl>
+                              <Input id="file-upload" type="file" className="sr-only" onChange={handleFileChange} />
+                            </div>
+
+                            {isSubmitting && uploadProgress > 0 && <Progress value={uploadProgress} className="w-full" />}
+
                             <Button type="submit" disabled={isSubmitting} className="w-full">
                                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 {submission ? 'Resubmit' : 'Submit'}

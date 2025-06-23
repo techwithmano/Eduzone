@@ -13,7 +13,7 @@ import { type Assignment, type Submission, type Classroom } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, User, Calendar } from 'lucide-react';
+import { ArrowLeft, User, Calendar, ExternalLink, File as FileIcon } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -126,7 +126,7 @@ export default function TeacherAssignmentPage() {
                                         <TableCell>{submission.submittedAt ? format(submission.submittedAt.toDate(), 'PPP p') : 'N/A'}</TableCell>
                                         <TableCell className="text-right">
                                             <Dialog>
-                                                <DialogTrigger asChild><Button variant="outline" size="sm">View</Button></DialogTrigger>
+                                                <DialogTrigger asChild><Button variant="outline" size="sm">View Submission</Button></DialogTrigger>
                                                 <DialogContent className="sm:max-w-2xl">
                                                     <DialogHeader>
                                                         <DialogTitle>Submission from {submission.studentName}</DialogTitle>
@@ -134,7 +134,28 @@ export default function TeacherAssignmentPage() {
                                                            Submitted on {submission.submittedAt ? format(submission.submittedAt.toDate(), 'PPP p') : 'N/A'}
                                                         </DialogDescription>
                                                     </DialogHeader>
-                                                    <ScrollArea className="h-64 mt-4 p-4 border rounded-md"><p className="whitespace-pre-wrap text-sm">{submission.content}</p></ScrollArea>
+                                                    <ScrollArea className="h-64 mt-4 p-4 border rounded-md bg-secondary/50 space-y-4">
+                                                        {submission.content && (
+                                                            <div>
+                                                                <h4 className="font-semibold mb-2 text-sm text-foreground">Text Response</h4>
+                                                                <p className="whitespace-pre-wrap text-sm text-muted-foreground">{submission.content}</p>
+                                                            </div>
+                                                        )}
+                                                        {submission.fileUrl && (
+                                                            <div>
+                                                                <h4 className="font-semibold mb-2 text-sm text-foreground">Attached File</h4>
+                                                                <Button asChild variant="outline">
+                                                                    <a href={submission.fileUrl} target="_blank" rel="noopener noreferrer">
+                                                                        <ExternalLink className="mr-2 h-4 w-4" />
+                                                                        {submission.fileName || 'View File'}
+                                                                    </a>
+                                                                </Button>
+                                                            </div>
+                                                        )}
+                                                        {!submission.content && !submission.fileUrl && (
+                                                            <p className="text-muted-foreground text-sm">No content or file was submitted.</p>
+                                                        )}
+                                                    </ScrollArea>
                                                 </DialogContent>
                                             </Dialog>
                                         </TableCell>

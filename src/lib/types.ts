@@ -60,9 +60,12 @@ export type Submission = {
   id: string; // Document ID is the student's UID
   studentId: string;
   studentName: string;
-  content: string;
+  content?: string;
   submittedAt: Timestamp;
   resubmittedAt?: Timestamp;
+  fileUrl?: string;
+  fileName?: string;
+  fileType?: string;
 };
 
 export type Material = {
