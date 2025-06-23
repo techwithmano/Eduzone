@@ -3,140 +3,74 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // --- Helper Functions ---
-    // These functions make the rules easier to read and maintain.
 
+    // Helper functions to make rules more readable.
     function isAuth() {
       return request.auth != null;
     }
-
-    function getUserData(userId) {
-      // Get the user's profile document from the 'users' collection.
-      return get(/databases/$(database)/documents/users/$(userId)).data;
+    function isRole(role) {
+      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+    function isOwner(userId) {
+      return isAuth() && request.auth.uid == userId;
+    }
+    function getClassroom(classroomId) {
+      return get(/databases/$(database)/documents/classrooms/$(classroomId));
+    }
+    function isClassroomAdmin(classroomId) {
+      let classroom = getClassroom(classroomId);
+      return isAuth() && classroom.data.creatorId == request.auth.uid;
+    }
+    function isClassroomTeacher(classroomId) {
+      let classroom = getClassroom(classroomId);
+      return isAuth() && request.auth.uid in classroom.data.teacherIds;
+    }
+    function isEnrolledStudent(classroomId) {
+      let classroom = getClassroom(classroomId);
+      return isAuth() && request.auth.uid in classroom.data.enrolledStudentIds;
+    }
+    function isClassroomMember(classroomId) {
+      return isClassroomAdmin(classroomId) || isClassroomTeacher(classroomId) || isEnrolledStudent(classroomId);
     }
 
-    function isRole(userId, role) {
-      // Check if the user has the specified role.
-      return getUserData(userId).role == role;
-    }
-
-    function isAdmin(userId) {
-      // Convenience function to check if a user is an ADMIN.
-      return isAuth() && isRole(userId, 'ADMIN');
-    }
-
-    function isClassroomCreator(classroomId, userId) {
-      // Check if the user is the original creator of the classroom.
-      return get(/databases/$(database)/documents/classrooms/$(classroomId)).data.creatorId == userId;
-    }
-
-    function isClassroomTeacher(classroomId, userId) {
-      // Check if the user is in the list of assigned teachers for the classroom.
-      // We check for existence of the 'teacherIds' field to avoid errors on old documents.
-      return 'teacherIds' in get(/databases/$(database)/documents/classrooms/$(classroomId)).data &&
-             userId in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherIds;
-    }
-    
-    function isClassroomStudent(classroomId, userId) {
-      // Check if the user is in the list of enrolled students for the classroom.
-      return userId in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.enrolledStudentIds;
-    }
-    
-    // Checks if the user is either the Admin creator or an assigned Teacher.
-    function canManageClassroom(classroomId, userId) {
-        return isAuth() && (isAdmin(userId) && isClassroomCreator(classroomId, userId)) || isClassroomTeacher(classroomId, userId);
-    }
-
-
-    // --- Collection Rules ---
-
-    // Rules for User Profiles
+    // User Profiles
     match /users/{userId} {
-      // Any authenticated user can read basic profile info (e.g., for names).
       allow read: if isAuth();
-      // A user can create their own profile document.
-      allow create: if isAuth() && request.auth.uid == userId;
-      // A user can update their own profile, OR an Admin can update any profile.
-      // This is crucial for when an Admin deletes a classroom and needs to clean up enrollments.
-      allow update: if isAuth() && (request.auth.uid == userId || isAdmin(request.auth.uid));
-      // Deleting users is disabled for safety.
-      allow delete: if false;
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isRole('ADMIN'); // Admins can modify user roles or classroom lists
     }
 
-    // Rules for the Public Store and Contact Form
-    match /products/{productId} {
-      // Anyone can see the products in the store.
-      allow read: if true;
-      // Only Admins can create, update, or delete products.
-      allow write: if isAdmin(request.auth.uid);
-    }
-
+    // Contact Form Submissions
     match /contacts/{contactId} {
-        // Anyone can submit the contact form.
-        allow create: if true;
-        // Only Admins can view or delete contact messages.
-        allow read, write, delete: if isAdmin(request.auth.uid);
+      allow create: if true; // Anyone can send a message
+      allow read, update, delete: if false; // Managed in Firebase Console
     }
     
-    // Rules for Classrooms and their Subcollections
+    // Store Products
+    match /products/{productId} {
+      allow read: if true; // Publicly readable store
+      allow create, update, delete: if isRole('ADMIN');
+    }
+    
+    // Classrooms
     match /classrooms/{classroomId} {
-      // READ: You can see a classroom if you are the Admin creator, an assigned Teacher, or an enrolled Student.
-      // This fixes the "empty dashboard" bug for all roles.
-      allow read: if isAuth() && (
-        isClassroomCreator(classroomId, request.auth.uid) || 
-        isClassroomTeacher(classroomId, request.auth.uid) || 
-        isClassroomStudent(classroomId, request.auth.uid)
-      );
-      
-      // CREATE: Only Admins can create new classrooms.
-      allow create: if isAdmin(request.auth.uid);
+      allow read: if isClassroomMember(classroomId);
+      allow create: if isRole('ADMIN');
+      allow update: if isClassroomAdmin(classroomId);
+      allow delete: if isClassroomAdmin(classroomId);
 
-      // UPDATE: The Admin creator or an assigned Teacher can update classroom details.
-      allow update: if canManageClassroom(classroomId, request.auth.uid);
-      
-      // DELETE: Only the original Admin creator can delete an entire classroom.
-      allow delete: if isAdmin(request.auth.uid) && isClassroomCreator(classroomId, request.auth.uid);
-      
-      // -- SUBCOLLECTION: Announcements, Materials, Assignments, Quizzes --
-      function canReadContent() {
-        return isAuth() && (isClassroomStudent(classroomId, request.auth.uid) || canManageClassroom(classroomId, request.auth.uid));
-      }
-      
-      match /announcements/{docId} {
-        allow read: if canReadContent();
-        allow write: if canManageClassroom(classroomId, request.auth.uid);
-      }
-      match /materials/{docId} {
-        allow read: if canReadContent();
-        allow write: if canManageClassroom(classroomId, request.auth.uid);
-      }
-      match /assignments/{assignmentId} {
-        allow read: if canReadContent();
-        allow write: if canManageClassroom(classroomId, request.auth.uid); // This covers create, update, and delete for assignments.
+      // Announcements, Materials, Assignments, Quizzes
+      match /{collection}/{docId}
+      where collection in ['announcements', 'materials', 'assignments', 'quizzes'] {
+        allow read: if isClassroomMember(classroomId);
+        allow create, update, delete: if isClassroomAdmin(classroomId) || isClassroomTeacher(classroomId);
 
-        // -- NESTED SUBCOLLECTION: Assignment Submissions --
-        match /submissions/{studentId} {
-            // Read: The student who owns it, or a manager (Admin/Teacher).
-            allow read: if isAuth() && (request.auth.uid == studentId || canManageClassroom(classroomId, request.auth.uid));
-            // Create: Only the student can create their own submission.
-            allow create: if isAuth() && request.auth.uid == studentId;
-            // Update: Only managers can update (for grading). Fixes grade submission failure.
-            allow update: if canManageClassroom(classroomId, request.auth.uid);
-            // Delete: Only managers can delete. Fixes assignment deletion failure.
-            allow delete: if canManageClassroom(classroomId, request.auth.uid);
-        }
-      }
-       match /quizzes/{quizId} {
-        allow read: if canReadContent();
-        allow write: if canManageClassroom(classroomId, request.auth.uid);
-
-        // -- NESTED SUBCOLLECTION: Quiz Submissions --
-        match /submissions/{studentId} {
-            allow read: if isAuth() && (request.auth.uid == studentId || canManageClassroom(classroomId, request.auth.uid));
-            allow create: if isAuth() && request.auth.uid == studentId;
-            allow update: if canManageClassroom(classroomId, request.auth.uid);
-            allow delete: if canManageClassroom(classroomId, request.auth.uid);
+        // Submissions for Assignments and Quizzes
+        match /submissions/{submissionId} {
+          allow read: if isClassroomAdmin(classroomId) || isClassroomTeacher(classroomId) || isOwner(submissionId);
+          allow create: if isOwner(submissionId) && !exists(/databases/$(database)/documents/classrooms/$(classroomId)/$(collection)/$(docId)/submissions/$(submissionId));
+          allow update: if isClassroomAdmin(classroomId) || isClassroomTeacher(classroomId);
+          allow delete: if isClassroomAdmin(classroomId) || isClassroomTeacher(classroomId);
         }
       }
     }
