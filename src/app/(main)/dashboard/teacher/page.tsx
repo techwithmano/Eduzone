@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
-import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { type Classroom } from "@/lib/types";
 
@@ -35,14 +35,16 @@ export default function TeacherDashboardPage() {
     }
 
     setLoading(true);
+    // This query is now fixed: removed the invalid `orderBy` clause.
     const classroomQuery = query(
         collection(db, "classrooms"), 
-        where("teacherIds", "array-contains", user.uid),
-        orderBy("createdAt", "desc")
+        where("teacherIds", "array-contains", user.uid)
     );
 
     const unsubscribe = onSnapshot(classroomQuery, (querySnapshot) => {
         const assignedClassrooms = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Classroom[];
+        // Manual sort on the client-side
+        assignedClassrooms.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
         setClassrooms(assignedClassrooms);
         setLoading(false);
     }, (error) => {
