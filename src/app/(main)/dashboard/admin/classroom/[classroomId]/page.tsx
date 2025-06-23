@@ -32,7 +32,7 @@ import { AnnouncementCard } from '@/components/announcement-card';
 import { AssignmentCard } from '@/components/assignment-card';
 import { MaterialCard } from '@/components/material-card';
 import { QuizCard } from '@/components/quiz-card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
