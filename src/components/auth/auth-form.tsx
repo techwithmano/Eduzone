@@ -11,7 +11,7 @@ import {
   signInWithEmailAndPassword,
   updateProfile,
 } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase/client";
 
 
@@ -63,9 +63,30 @@ export function AuthForm() {
   const handleLogin = async (values: z.infer<typeof loginSchema>) => {
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
-      toast({ title: "Login successful!" });
-      router.push("/dashboard");
+      const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
+      const user = userCredential.user;
+
+      // Fetch user profile to get the role
+      const userDocRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists()) {
+        const userProfile = userDoc.data();
+        toast({ title: "Login successful!" });
+
+        // Redirect based on role
+        if (userProfile.role === "ADMIN") {
+          router.push("/dashboard/admin");
+        } else if (userProfile.role === "TEACHER") {
+          router.push("/dashboard/teacher");
+        } else {
+          router.push("/dashboard/student");
+        }
+      } else {
+        // Fallback in case the user document doesn't exist for some reason
+        toast({ title: "Login successful!" });
+        router.push("/dashboard");
+      }
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -100,7 +121,7 @@ export function AuthForm() {
       });
 
       toast({ title: "Sign up successful!", description: "Welcome to EduZone!" });
-      router.push("/dashboard");
+      router.push("/dashboard/student");
     } catch (error: any) {
        toast({
         variant: "destructive",
