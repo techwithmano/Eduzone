@@ -18,7 +18,7 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { type Classroom, type Announcement, type Assignment, type UserProfile, type Material, type Quiz } from '@/lib/types';
 import { format } from "date-fns";
 
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Loader2, Megaphone, FileText, Plus, CalendarIcon, Settings, Users, Trash2, Notebook, BookOpen, X, UserCog } from 'lucide-react';
