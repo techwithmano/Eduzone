@@ -121,14 +121,21 @@ export default function AdminClassroomPage() {
     if (!user) return;
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, `classrooms/${classroomId}/${collectionName}`), {
+      const dataToSave: any = {
         ...data,
         createdAt: serverTimestamp(),
-      });
-      toast({ title: `${collectionName.slice(0, -1)} created!` });
+      };
+
+      if (collectionName === 'announcements') {
+        dataToSave.authorId = user.uid;
+        dataToSave.authorName = "Admin";
+      }
+
+      await addDoc(collection(db, `classrooms/${classroomId}/${collectionName}`), dataToSave);
+      toast({ title: `${collectionName.charAt(0).toUpperCase() + collectionName.slice(1, -1)} created!` });
       return true;
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: `Failed to create ${collectionName}.` });
+      toast({ variant: "destructive", title: "Error", description: `Failed to create ${collectionName.slice(0, -1)}.` });
       return false;
     } finally {
       setIsSubmitting(false);
