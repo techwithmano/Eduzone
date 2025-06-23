@@ -24,6 +24,7 @@ import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 
 const createQuizFormSchema = (questions: Quiz['questions'] = []) => {
     const schemaObject = questions.reduce((acc, question, index) => {
