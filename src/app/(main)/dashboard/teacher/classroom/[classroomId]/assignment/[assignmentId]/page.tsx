@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { doc, getDoc, collection, query, orderBy, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
@@ -37,7 +38,8 @@ const GradeForm = ({ submission, classroomId, assignmentId }: { submission: Subm
     const { toast } = useToast();
     const [isGrading, setIsGrading] = useState(false);
     const [feedbackFile, setFeedbackFile] = useState<File | null>(null);
-    
+    const [uploadProgress, setUploadProgress] = useState(0);
+
     const form = useForm<z.infer<typeof gradeSchema>>({
         resolver: zodResolver(gradeSchema),
         defaultValues: { grade: 0, feedback: "" },
@@ -46,49 +48,61 @@ const GradeForm = ({ submission, classroomId, assignmentId }: { submission: Subm
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
-            if (file.size > 700 * 1024) { // 700KB limit
-                toast({ variant: 'destructive', title: 'File too large', description: 'Please upload a file smaller than 700KB.' });
+            if (file.size > 50 * 1024 * 1024) { // 50MB limit
+                toast({ variant: 'destructive', title: 'File too large', description: 'Please upload a file smaller than 50MB.' });
                 return;
             }
             setFeedbackFile(file);
         }
     };
 
-    const fileToDataUri = (file: File): Promise<string> => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-    }
-
     const handleGradeSubmit = async (values: z.infer<typeof gradeSchema>) => {
         setIsGrading(true);
-        try {
-            let fileInfo: { url: string, name: string } | undefined;
+        setUploadProgress(0);
 
-            if (feedbackFile) {
-                const dataUri = await fileToDataUri(feedbackFile);
-                fileInfo = { url: dataUri, name: feedbackFile.name };
+        const sendGradeData = async (fileUrl?: string, fileName?: string) => {
+            try {
+                const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, submission.id);
+                await updateDoc(submissionDocRef, {
+                    status: 'graded',
+                    grade: values.grade,
+                    teacherFeedback: values.feedback,
+                    gradedAt: serverTimestamp(),
+                    ...(fileUrl && { teacherFeedbackFileUrl: fileUrl, teacherFeedbackFileName: fileName }),
+                });
+                toast({ title: 'Success!', description: `Grade has been returned to ${submission.studentName}.` });
+            } catch (error) {
+                console.error("Grading error: ", error);
+                toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit the grade.' });
+            } finally {
+                setIsGrading(false);
             }
+        };
 
-            const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, submission.id);
-            await updateDoc(submissionDocRef, {
-                status: 'graded',
-                grade: values.grade,
-                teacherFeedback: values.feedback,
-                gradedAt: serverTimestamp(),
-                ...(fileInfo && { teacherFeedbackFileUrl: fileInfo.url, teacherFeedbackFileName: fileInfo.name }),
-            });
-            
-            toast({ title: 'Success!', description: `Grade has been returned to ${submission.studentName}.` });
-        } catch (error) {
-            console.error("Grading error: ", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit the grade. The file might be too large.' });
-        } finally {
-            setIsGrading(false);
+        if (!feedbackFile) {
+            await sendGradeData();
+            return;
         }
+
+        const storageRef = ref(storage, `graded-submissions/${classroomId}/${assignmentId}/${submission.id}/${feedbackFile.name}`);
+        const uploadTask = uploadBytesResumable(storageRef, feedbackFile);
+
+        uploadTask.on('state_changed',
+            (snapshot) => {
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                setUploadProgress(progress);
+            },
+            (error) => {
+                console.error("Upload error: ", error);
+                toast({ variant: 'destructive', title: 'Upload Failed', description: 'There was a problem uploading your feedback file.' });
+                setIsGrading(false);
+            },
+            () => {
+                getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+                    sendGradeData(downloadURL, feedbackFile.name);
+                });
+            }
+        );
     };
 
     return (
@@ -104,7 +118,7 @@ const GradeForm = ({ submission, classroomId, assignmentId }: { submission: Subm
             </div>
 
             <div className="space-y-2">
-                <Label>Return Graded File (Optional, Max 700KB)</Label>
+                <Label>Return Graded File (Optional, Max 50MB)</Label>
                 {feedbackFile && (
                     <div className="p-2 border rounded-md flex items-center justify-between text-sm bg-secondary">
                         <div className="flex items-center gap-2 truncate"><FileIcon className="h-4 w-4 shrink-0" /><span className="truncate">{feedbackFile.name}</span></div>
@@ -114,6 +128,8 @@ const GradeForm = ({ submission, classroomId, assignmentId }: { submission: Subm
                 <Button type="button" variant="outline" asChild><label htmlFor="feedback-file" className="w-full cursor-pointer"><Paperclip className="mr-2 h-4 w-4" />{feedbackFile ? 'Replace File' : 'Attach File'}</label></Button>
                 <Input id="feedback-file" type="file" className="sr-only" onChange={handleFileChange} />
             </div>
+
+            {isGrading && feedbackFile && <Progress value={uploadProgress} className="w-full" />}
 
             <Button type="submit" disabled={isGrading} className="w-full">
                 {isGrading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -243,7 +259,7 @@ export default function TeacherAssignmentPage() {
                                                     <ScrollArea className="h-[60vh] p-1">
                                                         <div className="p-4 border rounded-md bg-secondary/50 space-y-4 mb-4">
                                                             {submission.content && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{submission.content}</p>}
-                                                            {submission.fileUrl && <Button asChild variant="outline"><a href={submission.fileUrl} download={submission.fileName || 'submission'} rel="noopener noreferrer"><Download className="mr-2 h-4 w-4" />{submission.fileName || 'Download File'}</a></Button>}
+                                                            {submission.fileUrl && <Button asChild variant="outline"><a href={submission.fileUrl} target="_blank" download={submission.fileName || 'submission'} rel="noopener noreferrer"><Download className="mr-2 h-4 w-4" />{submission.fileName || 'Download File'}</a></Button>}
                                                             {!submission.content && !submission.fileUrl && <p className="text-muted-foreground text-sm">No content or file was submitted.</p>}
                                                         </div>
                                                         {submission.status === 'graded' ? (
@@ -251,7 +267,7 @@ export default function TeacherAssignmentPage() {
                                                                 <h4 className="font-semibold text-lg">Grade & Feedback</h4>
                                                                 <p className="text-2xl font-bold">{submission.grade}/100</p>
                                                                 {submission.teacherFeedback && <p className="text-muted-foreground text-sm whitespace-pre-wrap">{submission.teacherFeedback}</p>}
-                                                                {submission.teacherFeedbackFileUrl && <Button asChild variant="secondary"><a href={submission.teacherFeedbackFileUrl} download={submission.teacherFeedbackFileName || 'graded-file'} rel="noopener noreferrer"><Download className="mr-2 h-4 w-4" />{submission.teacherFeedbackFileName || 'Download Graded File'}</a></Button>}
+                                                                {submission.teacherFeedbackFileUrl && <Button asChild variant="secondary"><a href={submission.teacherFeedbackFileUrl} target="_blank" download={submission.teacherFeedbackFileName || 'graded-file'} rel="noopener noreferrer"><Download className="mr-2 h-4 w-4" />{submission.teacherFeedbackFileName || 'Download Graded File'}</a></Button>}
                                                             </div>
                                                         ) : (
                                                             <GradeForm submission={submission} classroomId={classroomId} assignmentId={assignmentId}/>
