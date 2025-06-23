@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
-import { collection, query, where, onSnapshot, orderBy, writeBatch, arrayRemove, doc, getDocs, addDoc, serverTimestamp, deleteDoc, limit } from "firebase/firestore";
+import { collection, query, where, onSnapshot, orderBy, writeBatch, arrayRemove, doc, getDocs, addDoc, serverTimestamp, deleteDoc, limit, documentId } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { type Classroom, type Product } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -144,29 +144,71 @@ export default function AdminDashboardPage() {
     setIsClassroomAlertOpen(true);
   };
   
-  const handleDeleteClassroomConfirm = async () => {
+ const handleDeleteClassroomConfirm = async () => {
     if (!classroomToDelete || !user) return;
+    setIsSubmitting(true);
     try {
+        const classroomId = classroomToDelete.id;
         const batch = writeBatch(db);
-        const classroomDocRef = doc(db, "classrooms", classroomToDelete.id);
-        batch.delete(classroomDocRef);
-        const userDocRef = doc(db, "users", user.uid);
-        batch.update(userDocRef, { createdClassroomIds: arrayRemove(classroomToDelete.id) });
-        const enrolledIds = classroomToDelete.enrolledStudentIds;
-        if(enrolledIds && enrolledIds.length > 0) {
-           const studentsQuery = query(collection(db, "users"), where('__name__', 'in', enrolledIds));
-           const studentDocs = await getDocs(studentsQuery);
-           studentDocs.forEach(studentDoc => {
-               batch.update(studentDoc.ref, { enrolledClassroomIds: arrayRemove(classroomToDelete.id) });
-           });
+
+        // Define subcollections to delete
+        const subcollections = ['announcements', 'materials'];
+        for (const subcollectionName of subcollections) {
+            const subcollectionRef = collection(db, `classrooms/${classroomId}/${subcollectionName}`);
+            const snapshot = await getDocs(subcollectionRef);
+            snapshot.forEach(doc => batch.delete(doc.ref));
         }
+
+        // Handle assignments and their submissions
+        const assignmentsRef = collection(db, `classrooms/${classroomId}/assignments`);
+        const assignmentsSnapshot = await getDocs(assignmentsRef);
+        for (const assignmentDoc of assignmentsSnapshot.docs) {
+            const submissionsRef = collection(db, assignmentDoc.ref.path, 'submissions');
+            const submissionsSnapshot = await getDocs(submissionsRef);
+            submissionsSnapshot.forEach(subDoc => batch.delete(subDoc.ref));
+            batch.delete(assignmentDoc.ref);
+        }
+        
+        // Handle quizzes and their submissions
+        const quizzesRef = collection(db, `classrooms/${classroomId}/quizzes`);
+        const quizzesSnapshot = await getDocs(quizzesRef);
+        for (const quizDoc of quizzesSnapshot.docs) {
+            const submissionsRef = collection(db, quizDoc.ref.path, 'submissions');
+            const submissionsSnapshot = await getDocs(submissionsRef);
+            submissionsSnapshot.forEach(subDoc => batch.delete(subDoc.ref));
+            batch.delete(quizDoc.ref);
+        }
+
+        const allUserIds = [...new Set([...(classroomToDelete.enrolledStudentIds || []), ...(classroomToDelete.teacherIds || [])])];
+        if (allUserIds.length > 0) {
+            for (let i = 0; i < allUserIds.length; i += 30) {
+                const chunk = allUserIds.slice(i, i + 30);
+                const usersQuery = query(collection(db, "users"), where(documentId(), "in", chunk));
+                const userDocs = await getDocs(usersQuery);
+                userDocs.forEach(userDoc => {
+                    batch.update(userDoc.ref, { enrolledClassroomIds: arrayRemove(classroomId) });
+                });
+            }
+        }
+        
+        // Remove from creator's list
+        const creatorDocRef = doc(db, "users", classroomToDelete.creatorId);
+        batch.update(creatorDocRef, { createdClassroomIds: arrayRemove(classroomId) });
+
+        // Finally, delete the classroom document itself
+        const classroomDocRef = doc(db, "classrooms", classroomId);
+        batch.delete(classroomDocRef);
+
         await batch.commit();
-        toast({ title: "Classroom Deleted" });
+
+        toast({ title: "Classroom Deleted", description: "The classroom and all its associated data have been removed." });
     } catch (error) {
-        toast({ variant: "destructive", title: "Deletion Failed" });
+        console.error("Error deleting classroom:", error);
+        toast({ variant: "destructive", title: "Deletion Failed", description: "There was a problem deleting the classroom." });
     } finally {
         setIsClassroomAlertOpen(false);
         setClassroomToDelete(null);
+        setIsSubmitting(false);
     }
   };
 
@@ -233,7 +275,10 @@ export default function AdminDashboardPage() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={() => setClassroomToDelete(null)}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleDeleteClassroomConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          <AlertDialogAction onClick={handleDeleteClassroomConfirm} disabled={isSubmitting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Delete
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

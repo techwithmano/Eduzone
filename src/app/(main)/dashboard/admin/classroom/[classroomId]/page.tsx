@@ -163,11 +163,30 @@ export default function AdminClassroomPage() {
         toast({ variant: "destructive", title: "Error", description: `Failed to delete.` });
     }
   };
+  
+  const handleDeleteAssignment = async (assignmentId: string) => {
+    if (!classroomId) return;
+    try {
+        const batch = writeBatch(db);
+        
+        const submissionsRef = collection(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`);
+        const submissionsSnapshot = await getDocs(submissionsRef);
+        submissionsSnapshot.forEach(doc => batch.delete(doc.ref));
+
+        const assignmentRef = doc(db, `classrooms/${classroomId}/assignments`, assignmentId);
+        batch.delete(assignmentRef);
+
+        await batch.commit();
+        toast({ title: "Assignment Deleted", description: "The assignment and all its submissions have been removed." });
+    } catch (error) {
+        toast({ variant: "destructive", title: "Deletion Failed", description: "There was a problem deleting the assignment." });
+    }
+  };
+
 
   const handleCreateAnnouncement = simpleCreate('announcements');
   const handleDeleteAnnouncement = simpleDelete('announcements');
   const handleCreateAssignment = simpleCreate('assignments');
-  const handleDeleteAssignment = simpleDelete('assignments');
   const handleCreateMaterial = simpleCreate('materials');
   const handleDeleteMaterial = simpleDelete('materials');
   const handleCreateQuiz = simpleCreate('quizzes');
