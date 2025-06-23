@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -25,6 +25,7 @@ const classroomSchema = z.object({
   title: z.string().min(5, { message: "Title must be at least 5 characters." }),
   description: z.string().min(10, { message: "Description must be at least 10 characters." }),
   subject: z.string({ required_error: "Please select a subject."}).min(1, "Please select a subject."),
+  displayTeacherName: z.string().max(100, "Name is too long.").optional(),
 });
 
 const subjects = ["Math", "Programming", "History", "Science", "English", "Art", "Music"];
@@ -41,6 +42,7 @@ export default function CreateClassroomPage() {
       title: "",
       description: "",
       subject: "",
+      displayTeacherName: "",
     },
   });
 
@@ -52,10 +54,9 @@ export default function CreateClassroomPage() {
     setLoading(true);
     try {
         const batch = writeBatch(db);
-
-        // 1. Create the new classroom document
         const newClassroomRef = doc(collection(db, "classrooms"));
-        batch.set(newClassroomRef, {
+        
+        const dataToSave: any = {
             ...values,
             id: newClassroomRef.id,
             imageUrl: `https://placehold.co/600x400.png?text=${values.subject.replace(' ', '+')}`,
@@ -64,15 +65,19 @@ export default function CreateClassroomPage() {
             enrolledStudentIds: [],
             teacherIds: [],
             createdAt: serverTimestamp(),
-        });
+        };
+
+        if (!dataToSave.displayTeacherName) {
+            delete dataToSave.displayTeacherName;
+        }
+
+        batch.set(newClassroomRef, dataToSave);
         
-        // 2. Add the classroom ID to the teacher's user document
         const userDocRef = doc(db, "users", user.uid);
         batch.update(userDocRef, {
             createdClassroomIds: arrayUnion(newClassroomRef.id)
         });
 
-        // 3. Commit the batch
         await batch.commit();
 
         toast({
@@ -136,6 +141,15 @@ export default function CreateClassroomPage() {
                                             {subjects.map(sub => <SelectItem key={sub} value={sub}>{sub}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+
+                             <FormField control={form.control} name="displayTeacherName" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Displayed Teacher Name (Optional)</FormLabel>
+                                    <FormControl><Input placeholder="e.g., Prof. John Doe" {...field} /></FormControl>
+                                    <FormDescription>If you leave this blank, the names of assigned teachers will be shown automatically.</FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )} />

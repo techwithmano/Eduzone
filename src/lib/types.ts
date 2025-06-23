@@ -20,6 +20,7 @@ export type Classroom = {
   subject: string;
   creatorId: string;
   creatorName: string;
+  displayTeacherName?: string;
   enrolledStudentIds: string[];
   teacherIds?: string[];
   createdAt: Timestamp;

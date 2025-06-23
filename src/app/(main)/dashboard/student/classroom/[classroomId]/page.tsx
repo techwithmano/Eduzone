@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { doc, getDoc, collection, query, orderBy, onSnapshot, Unsubscribe } from 'firebase/firestore';
+import { doc, getDoc, collection, query, orderBy, onSnapshot, Unsubscribe, where, documentId, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
 import { useToast } from '@/hooks/use-toast';
@@ -33,6 +33,7 @@ export default function StudentClassroomPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [teacherNames, setTeacherNames] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -55,7 +56,16 @@ export default function StudentClassroomPage() {
         if (classroomDoc.exists()) {
           // Security check: ensure student is enrolled
           if (user.enrolledClassroomIds?.includes(classroomDoc.id)) {
-            setClassroom({ ...classroomDoc.data(), id: classroomDoc.id } as Classroom);
+            const classroomData = { ...classroomDoc.data(), id: classroomDoc.id } as Classroom;
+            setClassroom(classroomData);
+            
+            if (classroomData.teacherIds && classroomData.teacherIds.length > 0) {
+              const teachersQuery = query(collection(db, "users"), where(documentId(), "in", classroomData.teacherIds.slice(0, 10)));
+              const teachersSnapshot = await getDocs(teachersQuery);
+              const names = teachersSnapshot.docs.map(doc => doc.data().displayName).filter(Boolean);
+              setTeacherNames(names);
+            }
+
           } else {
             toast({ variant: 'destructive', title: 'Access Denied', description: 'You are not enrolled in this classroom.' });
             router.push('/dashboard/student');
@@ -96,6 +106,17 @@ export default function StudentClassroomPage() {
 
     return () => unsubscribers.forEach(unsub => unsub());
   }, [classroomId]);
+
+  const getTaughtByText = () => {
+    if (!classroom) return "";
+    if (classroom.displayTeacherName) {
+        return classroom.displayTeacherName;
+    }
+    if (teacherNames.length > 0) {
+        return teacherNames.join(', ');
+    }
+    return classroom.creatorName;
+  }
 
   if (loading || authLoading) {
     return (
@@ -140,7 +161,7 @@ export default function StudentClassroomPage() {
       <div className="mb-6">
         <Badge variant="secondary" className="mb-2">{classroom.subject}</Badge>
         <h1 className="text-3xl md:text-4xl font-bold font-headline">{classroom.title}</h1>
-        <p className="text-muted-foreground mt-1">Taught by {classroom.creatorName}</p>
+        <p className="text-muted-foreground mt-1">Taught by {getTaughtByText()}</p>
       </div>
 
        <Tabs defaultValue="announcements" className="w-full">

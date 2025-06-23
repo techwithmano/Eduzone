@@ -11,7 +11,8 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   doc, getDoc, collection, addDoc, query, orderBy, onSnapshot,
   serverTimestamp, deleteDoc, Unsubscribe, updateDoc,
-  where, getDocs, writeBatch, arrayUnion, arrayRemove, documentId, limit
+  where, getDocs, writeBatch, arrayUnion, arrayRemove, documentId, limit,
+  deleteField
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -25,19 +26,19 @@ import { ArrowLeft, Loader2, Megaphone, FileText, Plus, CalendarIcon, Settings, 
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from '@/hooks/use-toast';
 import { AnnouncementCard } from '@/components/announcement-card';
 import { AssignmentCard } from '@/components/assignment-card';
 import { MaterialCard } from '@/components/material-card';
 import { QuizCard } from '@/components/quiz-card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -85,6 +86,7 @@ const editClassroomSchema = z.object({
   title: z.string().min(5, { message: "Title must be at least 5 characters." }),
   description: z.string().min(10, { message: "Description must be at least 10 characters." }),
   subject: z.string({ required_error: "Please select a subject."}).min(1, "Please select a subject."),
+  displayTeacherName: z.string().max(100, "Name is too long.").optional(),
 });
 
 const subjects = ["Math", "Programming", "History", "Science", "English", "Art", "Music"];
@@ -123,7 +125,7 @@ export default function AdminClassroomPage() {
   const quizForm = useForm<z.infer<typeof quizSchema>>({ resolver: zodResolver(quizSchema), defaultValues: { title: "", description: "", questions: [] }});
   const { fields: quizQuestions, append: appendQuizQuestion, remove: removeQuizQuestion, update: updateQuizQuestion } = useFieldArray({ control: quizForm.control, name: "questions" });
   
-  const editClassroomForm = useForm<z.infer<typeof editClassroomSchema>>({ resolver: zodResolver(editClassroomSchema), defaultValues: { title: "", description: "", subject: "" } });
+  const editClassroomForm = useForm<z.infer<typeof editClassroomSchema>>({ resolver: zodResolver(editClassroomSchema), defaultValues: { title: "", description: "", subject: "", displayTeacherName: "" } });
   const addStudentForm = useForm<z.infer<typeof addUserSchema>>({ resolver: zodResolver(addUserSchema), defaultValues: { email: "" } });
   const addTeacherForm = useForm<z.infer<typeof addUserSchema>>({ resolver: zodResolver(addUserSchema), defaultValues: { email: "" } });
   
@@ -292,7 +294,11 @@ export default function AdminClassroomPage() {
   const handleUpdateClassroom = async (values: z.infer<typeof editClassroomSchema>) => {
     setIsSubmitting(true);
     try {
-        await updateDoc(doc(db, "classrooms", classroomId), values);
+        const dataToUpdate: any = { ...values };
+        if (!values.displayTeacherName) {
+            dataToUpdate.displayTeacherName = deleteField();
+        }
+        await updateDoc(doc(db, "classrooms", classroomId), dataToUpdate);
         setClassroom(prev => prev ? { ...prev, ...values } : null);
         toast({ title: "Classroom Updated!", description: "Your classroom has been successfully updated." });
     } catch(error) {
@@ -323,7 +329,7 @@ export default function AdminClassroomPage() {
             if (classroomDoc.exists() && classroomDoc.data().creatorId === user.uid) {
                 const classroomData = { id: classroomDoc.id, ...classroomDoc.data() } as Classroom;
                 setClassroom(classroomData);
-                editClassroomForm.reset({ title: classroomData.title, description: classroomData.description, subject: classroomData.subject });
+                editClassroomForm.reset({ title: classroomData.title, description: classroomData.description, subject: classroomData.subject, displayTeacherName: classroomData.displayTeacherName || "" });
                 fetchUsers(classroomData.enrolledStudentIds || [], setEnrolledStudents);
                 fetchUsers(classroomData.teacherIds || [], setAssignedTeachers);
 
@@ -826,6 +832,14 @@ export default function AdminClassroomPage() {
                                             {subjects.map(sub => <SelectItem key={sub} value={sub}>{sub}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                             <FormField control={editClassroomForm.control} name="displayTeacherName" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Displayed Teacher Name (Optional)</FormLabel>
+                                    <FormControl><Input placeholder="e.g., Prof. Jane Doe" {...field} /></FormControl>
+                                    <FormDescription>Leave blank to show assigned teachers automatically. Fill this in to show a specific name.</FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )} />
