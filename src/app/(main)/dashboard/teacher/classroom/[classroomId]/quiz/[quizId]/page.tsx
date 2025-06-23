@@ -205,7 +205,7 @@ export default function TeacherQuizResultsPage() {
     try {
         let manuallyCorrectedCount = 0;
         const newAnswers = submission.answers.map((answer, index) => {
-            if (quiz.questions[index].type === 'typed-answer' && grades[index]) {
+            if (answer.questionType === 'typed-answer' && grades[index]) {
                 const gradedAnswer = { ...answer, ...grades[index] };
                 if (gradedAnswer.isCorrect) manuallyCorrectedCount++;
                 return gradedAnswer;
