@@ -4,75 +4,113 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions to make rules more readable.
+    // =================================
+    // Helper Functions
+    // =================================
     function isAuth() {
       return request.auth != null;
     }
+
     function isRole(role) {
-      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
-    }
-    function isOwner(userId) {
-      return isAuth() && request.auth.uid == userId;
-    }
-    function getClassroom(classroomId) {
-      return get(/databases/$(database)/documents/classrooms/$(classroomId));
-    }
-    function isClassroomAdmin(classroomId) {
-      let classroom = getClassroom(classroomId);
-      return isAuth() && classroom.data.creatorId == request.auth.uid;
-    }
-    function isClassroomTeacher(classroomId) {
-      let classroom = getClassroom(classroomId);
-      return isAuth() && request.auth.uid in classroom.data.teacherIds;
-    }
-    function isEnrolledStudent(classroomId) {
-      let classroom = getClassroom(classroomId);
-      return isAuth() && request.auth.uid in classroom.data.enrolledStudentIds;
-    }
-    function isClassroomMember(classroomId) {
-      return isClassroomAdmin(classroomId) || isClassroomTeacher(classroomId) || isEnrolledStudent(classroomId);
+      // Use exists() to prevent errors if user doc isn't created yet.
+      return isAuth() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
 
-    // User Profiles
+    function isAdmin() {
+      return isRole('ADMIN');
+    }
+
+    function isTeacher() {
+      return isRole('TEACHER');
+    }
+
+    // Checks if the requesting user is the creator of the classroom
+    function isClassroomAdmin(classroomId) {
+      let classroomDoc = get(/databases/$(database)/documents/classrooms/$(classroomId));
+      return isAuth() && classroomDoc.data.creatorId == request.auth.uid;
+    }
+
+    // Checks if the requesting user is an assigned teacher for the classroom
+    function isClassroomTeacher(classroomId) {
+      let classroomDoc = get(/databases/$(database)/documents/classrooms/$(classroomId));
+      return isAuth() && 'teacherIds' in classroomDoc.data && request.auth.uid in classroomDoc.data.teacherIds;
+    }
+
+    // Checks if the requesting user is a valid member (Admin, Teacher, or Student)
+    function isClassroomMember(classroomId) {
+      // Check for document existence first to prevent read-before-write errors
+      if (!exists(/databases/$(database)/documents/classrooms/$(classroomId))) {
+        return false;
+      }
+      let classroomData = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
+      
+      // Defensively check for role existence and array membership
+      let isCreator = request.auth.uid == classroomData.creatorId;
+      let isTeacher = 'teacherIds' in classroomData && request.auth.uid in classroomData.teacherIds;
+      let isStudent = 'enrolledStudentIds' in classroomData && request.auth.uid in classroomData.enrolledStudentIds;
+      
+      return isAuth() && (isCreator || isTeacher || isStudent);
+    }
+
+    // =================================
+    // Collection Rules
+    // =================================
+
+    // USER PROFILES
     match /users/{userId} {
       allow read: if isAuth();
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || isRole('ADMIN'); // Admins can modify user roles or classroom lists
+      allow create: if isAuth() && request.auth.uid == userId;
+      allow update: if (isAuth() && request.auth.uid == userId) || isAdmin();
+      allow delete: if isAdmin();
     }
 
-    // Contact Form Submissions
-    match /contacts/{contactId} {
-      allow create: if true; // Anyone can send a message
-      allow read, update, delete: if false; // Managed in Firebase Console
-    }
-    
-    // Store Products
-    match /products/{productId} {
-      allow read: if true; // Publicly readable store
-      allow create, update, delete: if isRole('ADMIN');
-    }
-    
-    // Classrooms
+    // CLASSROOMS
     match /classrooms/{classroomId} {
-      allow read: if isClassroomMember(classroomId);
-      allow create: if isRole('ADMIN');
+      allow get: if isClassroomMember(classroomId);
+      allow list: if isAuth();
+      
+      allow create: if isAdmin();
       allow update: if isClassroomAdmin(classroomId);
       allow delete: if isClassroomAdmin(classroomId);
 
-      // Announcements, Materials, Assignments, Quizzes
-      match /{collection}/{docId}
-      where collection in ['announcements', 'materials', 'assignments', 'quizzes'] {
+      // CLASSROOM SUB-COLLECTIONS (Announcements, Assignments, etc.)
+      match /{subCollection}/{docId} {
         allow read: if isClassroomMember(classroomId);
-        allow create, update, delete: if isClassroomAdmin(classroomId) || isClassroomTeacher(classroomId);
-
-        // Submissions for Assignments and Quizzes
-        match /submissions/{submissionId} {
-          allow read: if isClassroomAdmin(classroomId) || isClassroomTeacher(classroomId) || isOwner(submissionId);
-          allow create: if isOwner(submissionId) && !exists(/databases/$(database)/documents/classrooms/$(classroomId)/$(collection)/$(docId)/submissions/$(submissionId));
-          allow update: if isClassroomAdmin(classroomId) || isClassroomTeacher(classroomId);
-          allow delete: if isClassroomAdmin(classroomId) || isClassroomTeacher(classroomId);
-        }
+        allow create, update: if isClassroomAdmin(classroomId) || isClassroomTeacher(classroomId);
+        // Let Admins or Teachers delete the content they create
+        allow delete: if (isClassroomAdmin(classroomId) || isClassroomTeacher(classroomId)) && (
+            resource.data.authorId == request.auth.uid || 
+            isClassroomAdmin(classroomId)
+          );
       }
+      
+      // ASSIGNMENT SUBMISSIONS
+      match /assignments/{assignmentId}/submissions/{studentId} {
+        allow get: if isClassroomMember(classroomId);
+        allow create: if isAuth() && request.auth.uid == studentId && !exists(path(request.path));
+        allow update: if isClassroomAdmin(classroomId) || isClassroomTeacher(classroomId);
+        allow delete: if isClassroomAdmin(classroomId) || isClassroomTeacher(classroomId);
+      }
+
+      // QUIZ SUBMISSIONS
+      match /quizzes/{quizId}/submissions/{studentId} {
+         allow get: if isClassroomMember(classroomId);
+         allow create: if isAuth() && request.auth.uid == studentId && !exists(path(request.path));
+         allow update: if isClassroomAdmin(classroomId) || isClassroomTeacher(classroomId);
+         allow delete: if isClassroomAdmin(classroomId) || isClassroomTeacher(classroomId);
+      }
+    }
+    
+    // STORE PRODUCTS
+    match /products/{productId} {
+      allow read;
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // CONTACT FORM SUBMISSIONS
+    match /contacts/{contactId} {
+        allow create;
+        allow read, update, delete: if false; // Only allow reading from server/console
     }
   }
 }
