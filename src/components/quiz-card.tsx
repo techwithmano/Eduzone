@@ -82,7 +82,7 @@ export function QuizCard({ quiz, classroomId, isTeacher = false, onDelete }: Qui
               {onDelete && (
                 <AlertDialog>
                     <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); e.preventDefault(); }} className="ml-1">
+                        <Button variant="ghost" size="icon" className="ml-1">
                             <Trash2 className="h-4 w-4 text-destructive" />
                             <span className="sr-only">Delete</span>
                         </Button>
