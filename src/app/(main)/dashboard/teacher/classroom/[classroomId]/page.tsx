@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
-import { type Classroom, type Announcement, type Assignment, type Material, type Quiz, type QuizQuestion } from '@/lib/types';
+import { type Classroom, type Announcement, type Assignment, type Material, type Quiz } from '@/lib/types';
 import { format } from "date-fns";
 
 import { Button } from '@/components/ui/button';
@@ -51,16 +51,28 @@ const materialSchema = z.object({
   description: z.string().max(5000).optional(),
   link: z.string().url(),
 });
-const quizQuestionSchema = z.object({
-    id: z.string(),
-    question: z.string().min(5),
-    options: z.array(z.string().min(1)).length(4),
-    correctAnswer: z.coerce.number().min(0).max(3),
-});
+
+const quizQuestionSchema = z.discriminatedUnion("type", [
+    z.object({
+        id: z.string(),
+        type: z.literal('multiple-choice'),
+        question: z.string().min(5, "Question must be at least 5 characters."),
+        options: z.array(z.string().min(1, "Option cannot be empty.")).length(4, "Please provide 4 options."),
+        correctAnswer: z.coerce.number().min(0).max(3),
+    }),
+    z.object({
+        id: z.string(),
+        type: z.literal('typed-answer'),
+        question: z.string().min(5, "Question must be at least 5 characters."),
+        options: z.optional(z.array(z.string())),
+        correctAnswer: z.optional(z.number())
+    }),
+]);
+
 const quizSchema = z.object({
-    title: z.string().min(3).max(100),
+    title: z.string().min(3, "Title must be at least 3 characters.").max(100),
     description: z.string().max(5000).optional(),
-    questions: z.array(quizQuestionSchema).min(1),
+    questions: z.array(quizQuestionSchema).min(1, "Please add at least one question."),
 });
 
 export default function TeacherClassroomPage() {
@@ -157,9 +169,10 @@ export default function TeacherClassroomPage() {
         try {
             const classroomDocRef = doc(db, "classrooms", classroomId);
             const classroomDoc = await getDoc(classroomDocRef);
+            const classroomData = classroomDoc.data() as Classroom;
 
-            if (classroomDoc.exists() && classroomDoc.data().teacherIds?.includes(user.uid)) {
-                setClassroom({ ...classroomDoc.data(), id: classroomDoc.id } as Classroom);
+            if (classroomDoc.exists() && classroomData.teacherIds?.includes(user.uid)) {
+                setClassroom({ id: classroomDoc.id, ...classroomData });
 
                 Object.entries({ announcements: setAnnouncements, assignments: setAssignments, materials: setMaterials, quizzes: setQuizzes })
                     .forEach(([name, setter]) => {
@@ -309,17 +322,43 @@ export default function TeacherClassroomPage() {
                                   <Separator />
                                   {quizQuestions.map((field, index) => (
                                       <Card key={field.id} className="mb-4">
-                                          <CardHeader><div className="flex justify-between items-center"><CardTitle>Question {index + 1}</CardTitle><Button type="button" variant="ghost" size="icon" onClick={() => removeQuizQuestion(index)}><X className="h-4 w-4" /></Button></div></CardHeader>
+                                          <CardHeader>
+                                              <div className="flex justify-between items-start gap-4">
+                                                  <CardTitle>Question {index + 1}</CardTitle>
+                                                  <div className="flex items-center gap-2">
+                                                    <FormField
+                                                      control={quizForm.control}
+                                                      name={`questions.${index}.type`}
+                                                      render={({ field: selectField }) => (
+                                                        <Select onValueChange={selectField.onChange} value={selectField.value}>
+                                                            <FormControl><SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger></FormControl>
+                                                            <SelectContent>
+                                                                <SelectItem value="multiple-choice">Multiple Choice</SelectItem>
+                                                                <SelectItem value="typed-answer">Typed Answer</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                      )}
+                                                    />
+                                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeQuizQuestion(index)}>
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
+                                                  </div>
+                                                </div>
+                                          </CardHeader>
                                           <CardContent className="space-y-4">
                                               <FormField control={quizForm.control} name={`questions.${index}.question`} render={({ field }) => ( <FormItem><FormLabel>Question Text</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                              <div className="grid grid-cols-2 gap-4">
-                                                  {[0, 1, 2, 3].map(optionIndex => (<FormField key={optionIndex} control={quizForm.control} name={`questions.${index}.options.${optionIndex}`} render={({ field }) => ( <FormItem><FormLabel>Option {optionIndex + 1}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />))}
-                                              </div>
-                                              <FormField control={quizForm.control} name={`questions.${index}.correctAnswer`} render={({ field }) => (<FormItem><FormLabel>Correct Answer</FormLabel><Select onValueChange={field.onChange} value={String(field.value)}><FormControl><SelectTrigger><SelectValue placeholder="Select correct option" /></SelectTrigger></FormControl><SelectContent><SelectItem value="0">Option 1</SelectItem><SelectItem value="1">Option 2</SelectItem><SelectItem value="2">Option 3</SelectItem><SelectItem value="3">Option 4</SelectItem></SelectContent></Select><FormMessage /></FormItem>)}/>
+                                              {field.type === 'multiple-choice' && (
+                                                <>
+                                                  <div className="grid grid-cols-2 gap-4">
+                                                      {[0, 1, 2, 3].map(optionIndex => (<FormField key={optionIndex} control={quizForm.control} name={`questions.${index}.options.${optionIndex}`} render={({ field }) => ( <FormItem><FormLabel>Option {optionIndex + 1}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />))}
+                                                  </div>
+                                                  <FormField control={quizForm.control} name={`questions.${index}.correctAnswer`} render={({ field }) => (<FormItem><FormLabel>Correct Answer</FormLabel><Select onValueChange={field.onChange} value={String(field.value)}><FormControl><SelectTrigger><SelectValue placeholder="Select correct option" /></SelectTrigger></FormControl><SelectContent><SelectItem value="0">Option 1</SelectItem><SelectItem value="1">Option 2</SelectItem><SelectItem value="2">Option 3</SelectItem><SelectItem value="3">Option 4</SelectItem></SelectContent></Select><FormMessage /></FormItem>)}/>
+                                                </>
+                                              )}
                                           </CardContent>
                                       </Card>
                                   ))}
-                                  <Button type="button" variant="outline" onClick={() => appendQuizQuestion({ id: uuidv4(), question: '', options: ['', '', '', ''], correctAnswer: 0})}><Plus className="mr-2 h-4 w-4" />Add Question</Button>
+                                  <Button type="button" variant="outline" onClick={() => appendQuizQuestion({ id: uuidv4(), type: 'multiple-choice', question: '', options: ['', '', '', ''], correctAnswer: 0})}><Plus className="mr-2 h-4 w-4" />Add Question</Button>
                                 </div>
                             </ScrollArea>
                             <DialogFooter>

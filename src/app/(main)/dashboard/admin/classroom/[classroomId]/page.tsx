@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
-import { type Classroom, type Announcement, type Assignment, type UserProfile, type Material, type Quiz, type QuizQuestion } from '@/lib/types';
+import { type Classroom, type Announcement, type Assignment, type UserProfile, type Material, type Quiz } from '@/lib/types';
 import { format } from "date-fns";
 
 import { Button } from '@/components/ui/button';
@@ -58,12 +58,23 @@ const materialSchema = z.object({
   link: z.string().url("Please enter a valid URL."),
 });
 
-const quizQuestionSchema = z.object({
-    id: z.string(),
-    question: z.string().min(5, "Question must be at least 5 characters."),
-    options: z.array(z.string().min(1, "Option cannot be empty.")).length(4, "Please provide 4 options."),
-    correctAnswer: z.coerce.number().min(0).max(3),
-});
+const quizQuestionSchema = z.discriminatedUnion("type", [
+    z.object({
+        id: z.string(),
+        type: z.literal('multiple-choice'),
+        question: z.string().min(5, "Question must be at least 5 characters."),
+        options: z.array(z.string().min(1, "Option cannot be empty.")).length(4, "Please provide 4 options."),
+        correctAnswer: z.coerce.number().min(0).max(3),
+    }),
+    z.object({
+        id: z.string(),
+        type: z.literal('typed-answer'),
+        question: z.string().min(5, "Question must be at least 5 characters."),
+        options: z.optional(z.array(z.string())),
+        correctAnswer: z.optional(z.number())
+    }),
+]);
+
 const quizSchema = z.object({
     title: z.string().min(3, "Title must be at least 3 characters.").max(100),
     description: z.string().max(5000).optional(),
@@ -110,7 +121,7 @@ export default function AdminClassroomPage() {
   const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema), defaultValues: { title: "", description: "" } });
   const materialForm = useForm<z.infer<typeof materialSchema>>({ resolver: zodResolver(materialSchema), defaultValues: { title: "", description: "", link: "" } });
   const quizForm = useForm<z.infer<typeof quizSchema>>({ resolver: zodResolver(quizSchema), defaultValues: { title: "", description: "", questions: [] }});
-  const { fields: quizQuestions, append: appendQuizQuestion, remove: removeQuizQuestion } = useFieldArray({ control: quizForm.control, name: "questions" });
+  const { fields: quizQuestions, append: appendQuizQuestion, remove: removeQuizQuestion, update: updateQuizQuestion } = useFieldArray({ control: quizForm.control, name: "questions" });
   
   const editClassroomForm = useForm<z.infer<typeof editClassroomSchema>>({ resolver: zodResolver(editClassroomSchema), defaultValues: { title: "", description: "", subject: "" } });
   const addStudentForm = useForm<z.infer<typeof addUserSchema>>({ resolver: zodResolver(addUserSchema), defaultValues: { email: "" } });
@@ -200,15 +211,15 @@ export default function AdminClassroomPage() {
         if (userSnapshot.empty) throw new Error("No user exists with this email address.");
         
         const userDoc = userSnapshot.docs[0];
-        const userData = userDoc.data();
+        const userData = userDoc.data() as UserProfile;
         if (userData.role !== role) throw new Error(`This user is not registered as a ${role.toLowerCase()}.`);
 
         const classroomDocRef = doc(db, "classrooms", classroomId);
         const classroomDoc = await getDoc(classroomDocRef);
-        const classroomData = classroomDoc.data();
+        const classroomData = classroomDoc.data() as Classroom;
 
-        const isAlreadyEnrolled = role === 'STUDENT' && classroomData?.enrolledStudentIds?.includes(userDoc.id);
-        const isAlreadyAssigned = role === 'TEACHER' && classroomData?.teacherIds?.includes(userDoc.id);
+        const isAlreadyEnrolled = role === 'STUDENT' && classroomData.enrolledStudentIds?.includes(userDoc.id);
+        const isAlreadyAssigned = role === 'TEACHER' && classroomData.teacherIds?.includes(userDoc.id);
         if (isAlreadyEnrolled || isAlreadyAssigned) throw new Error(`This ${role.toLowerCase()} is already in the classroom.`);
 
         const batch = writeBatch(db);
@@ -295,9 +306,9 @@ export default function AdminClassroomPage() {
             const classroomDoc = await getDoc(classroomDocRef);
 
             if (classroomDoc.exists() && classroomDoc.data().creatorId === user.uid) {
-                const classroomData = { ...classroomDoc.data(), id: classroomDoc.id } as Classroom;
+                const classroomData = { id: classroomDoc.id, ...classroomDoc.data() } as Classroom;
                 setClassroom(classroomData);
-                editClassroomForm.reset(classroomData);
+                editClassroomForm.reset({ title: classroomData.title, description: classroomData.description, subject: classroomData.subject });
                 fetchUsers(classroomData.enrolledStudentIds || [], setEnrolledStudents);
                 fetchUsers(classroomData.teacherIds || [], setAssignedTeachers);
 
@@ -513,40 +524,60 @@ export default function AdminClassroomPage() {
                                       {quizQuestions.map((field, index) => (
                                           <Card key={field.id} className="mb-4">
                                               <CardHeader>
-                                                  <div className="flex justify-between items-center">
-                                                      <CardTitle>Question {index + 1}</CardTitle>
-                                                      <Button type="button" variant="ghost" size="icon" onClick={() => removeQuizQuestion(index)}>
-                                                          <X className="h-4 w-4" />
-                                                      </Button>
+                                                <div className="flex justify-between items-start gap-4">
+                                                  <CardTitle>Question {index + 1}</CardTitle>
+                                                  <div className="flex items-center gap-2">
+                                                    <FormField
+                                                      control={quizForm.control}
+                                                      name={`questions.${index}.type`}
+                                                      render={({ field: selectField }) => (
+                                                        <Select onValueChange={selectField.onChange} value={selectField.value}>
+                                                            <FormControl><SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger></FormControl>
+                                                            <SelectContent>
+                                                                <SelectItem value="multiple-choice">Multiple Choice</SelectItem>
+                                                                <SelectItem value="typed-answer">Typed Answer</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                      )}
+                                                    />
+                                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeQuizQuestion(index)}>
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
                                                   </div>
+                                                </div>
                                               </CardHeader>
                                               <CardContent className="space-y-4">
                                                   <FormField control={quizForm.control} name={`questions.${index}.question`} render={({ field }) => ( <FormItem><FormLabel>Question Text</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                      {[0, 1, 2, 3].map(optionIndex => (
-                                                          <FormField key={optionIndex} control={quizForm.control} name={`questions.${index}.options.${optionIndex}`} render={({ field }) => ( <FormItem><FormLabel>Option {optionIndex + 1}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                                      ))}
-                                                  </div>
-                                                  <FormField control={quizForm.control} name={`questions.${index}.correctAnswer`} render={({ field }) => (
-                                                      <FormItem>
-                                                          <FormLabel>Correct Answer</FormLabel>
-                                                          <Select onValueChange={field.onChange} value={String(field.value)}>
-                                                              <FormControl><SelectTrigger><SelectValue placeholder="Select correct option" /></SelectTrigger></FormControl>
-                                                              <SelectContent>
-                                                                  <SelectItem value="0">Option 1</SelectItem>
-                                                                  <SelectItem value="1">Option 2</SelectItem>
-                                                                  <SelectItem value="2">Option 3</SelectItem>
-                                                                  <SelectItem value="3">Option 4</SelectItem>
-                                                              </SelectContent>
-                                                          </Select>
-                                                          <FormMessage />
-                                                      </FormItem>
-                                                  )}/>
+                                                  
+                                                  {field.type === 'multiple-choice' && (
+                                                    <>
+                                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                          {[0, 1, 2, 3].map(optionIndex => (
+                                                              <FormField key={optionIndex} control={quizForm.control} name={`questions.${index}.options.${optionIndex}`} render={({ field }) => ( <FormItem><FormLabel>Option {optionIndex + 1}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                                          ))}
+                                                      </div>
+                                                      <FormField control={quizForm.control} name={`questions.${index}.correctAnswer`} render={({ field }) => (
+                                                          <FormItem>
+                                                              <FormLabel>Correct Answer</FormLabel>
+                                                              <Select onValueChange={field.onChange} value={String(field.value)}>
+                                                                  <FormControl><SelectTrigger><SelectValue placeholder="Select correct option" /></SelectTrigger></FormControl>
+                                                                  <SelectContent>
+                                                                      <SelectItem value="0">Option 1</SelectItem>
+                                                                      <SelectItem value="1">Option 2</SelectItem>
+                                                                      <SelectItem value="2">Option 3</SelectItem>
+                                                                      <SelectItem value="3">Option 4</SelectItem>
+                                                                  </SelectContent>
+                                                              </Select>
+                                                              <FormMessage />
+                                                          </FormItem>
+                                                      )}/>
+                                                    </>
+                                                  )}
                                               </CardContent>
                                           </Card>
                                       ))}
                                   </div>
-                                  <Button type="button" variant="outline" onClick={() => appendQuizQuestion({ id: uuidv4(), question: '', options: ['', '', '', ''], correctAnswer: 0})}>
+                                  <Button type="button" variant="outline" onClick={() => appendQuizQuestion({ id: uuidv4(), type: 'multiple-choice', question: '', options: ['', '', '', ''], correctAnswer: 0})}>
                                       <Plus className="mr-2 h-4 w-4" />Add Question
                                   </Button>
                                 </div>
@@ -626,8 +657,8 @@ export default function AdminClassroomPage() {
 
           {/* Students Tab */}
           <TabsContent value="students">
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-                <div className="md:col-span-1">
+             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 items-start">
+                <div className="lg:col-span-1">
                     <Card>
                         <CardHeader>
                             <CardTitle>Add Student</CardTitle>
@@ -652,7 +683,7 @@ export default function AdminClassroomPage() {
                         </CardContent>
                     </Card>
                 </div>
-                <div className="md:col-span-2">
+                <div className="md:col-span-1 lg:col-span-2">
                     <Card>
                         <CardHeader>
                             <CardTitle>Enrolled Students</CardTitle>
@@ -684,8 +715,8 @@ export default function AdminClassroomPage() {
           
           {/* Teachers Tab */}
           <TabsContent value="teachers">
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-                <div className="md:col-span-1">
+             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 items-start">
+                <div className="lg:col-span-1">
                     <Card>
                         <CardHeader>
                             <CardTitle>Assign Teacher</CardTitle>
@@ -710,7 +741,7 @@ export default function AdminClassroomPage() {
                         </CardContent>
                     </Card>
                 </div>
-                <div className="md:col-span-2">
+                <div className="md:col-span-1 lg:col-span-2">
                     <Card>
                         <CardHeader>
                             <CardTitle>Assigned Teachers</CardTitle>

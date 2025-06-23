@@ -2,7 +2,7 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
-import { type Quiz } from "@/lib/types";
+import { type Quiz, type QuizSubmission } from "@/lib/types";
 import { Button } from "./ui/button";
 import { Trash2, ArrowRight } from "lucide-react";
 import Link from "next/link";
@@ -18,6 +18,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "./providers/auth-provider";
+import { useEffect, useState } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase/client";
 
 interface QuizCardProps {
   quiz: Quiz;
@@ -28,7 +31,23 @@ interface QuizCardProps {
 
 export function QuizCard({ quiz, classroomId, isTeacher = false, onDelete }: QuizCardProps) {
   const { user } = useAuth();
+  const [submission, setSubmission] = useState<QuizSubmission | null>(null);
+  const [loading, setLoading] = useState(true);
   
+  useEffect(() => {
+    if (!user || isTeacher) {
+      setLoading(false);
+      return;
+    }
+    const subDocRef = doc(db, `classrooms/${classroomId}/quizzes/${quiz.id}/submissions`, user.uid);
+    const unsubscribe = onSnapshot(subDocRef, (doc) => {
+      setSubmission(doc.exists() ? doc.data() as QuizSubmission : null);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, [user, classroomId, quiz.id, isTeacher]);
+
+
   const getLinkPath = () => {
     if (user?.role === 'ADMIN') {
         return `/dashboard/admin/classroom/${classroomId}/quiz/${quiz.id}`;
@@ -38,6 +57,12 @@ export function QuizCard({ quiz, classroomId, isTeacher = false, onDelete }: Qui
     }
     return `/dashboard/student/classroom/${classroomId}/quiz/${quiz.id}`;
   }
+
+  const getStudentButtonText = () => {
+    if (loading) return "Loading...";
+    return submission ? "Review Quiz" : "Start Quiz";
+  };
+
 
   const cardContent = (
      <div className="flex justify-between items-center p-4 gap-4">
@@ -80,7 +105,7 @@ export function QuizCard({ quiz, classroomId, isTeacher = false, onDelete }: Qui
           ) : (
               <Button asChild variant="secondary" size="sm">
                   <Link href={getLinkPath()}>
-                      Start Quiz
+                      {getStudentButtonText()}
                       <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
               </Button>
