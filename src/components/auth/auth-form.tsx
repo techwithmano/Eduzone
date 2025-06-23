@@ -66,7 +66,6 @@ export function AuthForm() {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       toast({ title: "Login successful!" });
       router.push("/dashboard");
-      router.refresh(); 
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -102,7 +101,6 @@ export function AuthForm() {
 
       toast({ title: "Sign up successful!", description: "Welcome to EduZone!" });
       router.push("/dashboard");
-      router.refresh();
     } catch (error: any) {
        toast({
         variant: "destructive",
