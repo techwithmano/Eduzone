@@ -62,20 +62,17 @@ const GradeForm = ({ submission, classroomId, assignmentId }: { submission: Subm
             let fileInfo: { url: string, name: string } | undefined;
 
             if (feedbackFile) {
-                 const storageRef = ref(storage, `feedback/${classroomId}/${assignmentId}/${submission.studentId}/${feedbackFile.name}`);
-                 const uploadTask = uploadBytesResumable(storageRef, feedbackFile);
+                const storageRef = ref(storage, `feedback/${classroomId}/${assignmentId}/${submission.studentId}/${feedbackFile.name}`);
+                const uploadTask = uploadBytesResumable(storageRef, feedbackFile);
                  
-                 await new Promise<void>((resolve, reject) => {
-                    uploadTask.on('state_changed',
-                        (snapshot) => setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
-                        (error) => reject(error),
-                        async () => {
-                            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                            fileInfo = { url: downloadURL, name: feedbackFile.name };
-                            resolve();
-                        }
-                    );
-                });
+                uploadTask.on('state_changed',
+                    (snapshot) => setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100)
+                );
+
+                await uploadTask;
+
+                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                fileInfo = { url: downloadURL, name: feedbackFile.name };
             }
 
             const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, submission.id);
@@ -89,6 +86,7 @@ const GradeForm = ({ submission, classroomId, assignmentId }: { submission: Subm
             
             toast({ title: 'Success!', description: `Grade has been returned to ${submission.studentName}.` });
         } catch (error) {
+            console.error("Grading error: ", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit the grade.' });
         } finally {
             setIsGrading(false);

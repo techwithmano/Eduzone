@@ -73,18 +73,17 @@ const SubmissionForm = ({ assignment, classroomId, assignmentId }: { assignment:
             if (selectedFile) {
                 const storageRef = ref(storage, `submissions/${classroomId}/${assignmentId}/${user.uid}/${selectedFile.name}`);
                 const uploadTask = uploadBytesResumable(storageRef, selectedFile);
-                
-                await new Promise<void>((resolve, reject) => {
-                    uploadTask.on('state_changed',
-                        (snapshot) => { setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100); },
-                        (error) => reject(error),
-                        async () => {
-                            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                            fileInfo = { fileUrl: downloadURL, fileName: selectedFile.name };
-                            resolve();
-                        }
-                    );
-                });
+
+                uploadTask.on('state_changed',
+                    (snapshot) => {
+                        setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+                    }
+                );
+
+                await uploadTask;
+
+                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                fileInfo = { fileUrl: downloadURL, fileName: selectedFile.name };
             }
 
             const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, user.uid);
@@ -102,7 +101,8 @@ const SubmissionForm = ({ assignment, classroomId, assignmentId }: { assignment:
             toast({ title: 'Success!', description: `Your work for "${assignment.title}" has been submitted.` });
             
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit your work.' });
+            console.error("Submission error: ", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit your work. Please check your network connection or contact support.' });
         } finally {
             setIsSubmitting(false);
             setUploadProgress(0);
