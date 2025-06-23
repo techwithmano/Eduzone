@@ -72,18 +72,29 @@ const SubmissionForm = ({ assignment, classroomId, assignmentId }: { assignment:
 
             if (selectedFile) {
                 const storageRef = ref(storage, `submissions/${classroomId}/${assignmentId}/${user.uid}/${selectedFile.name}`);
-                const uploadTask = uploadBytesResumable(storageRef, selectedFile);
-
-                uploadTask.on('state_changed',
-                    (snapshot) => {
-                        setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-                    }
-                );
-
-                await uploadTask;
-
-                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                fileInfo = { fileUrl: downloadURL, fileName: selectedFile.name };
+                
+                await new Promise<void>((resolve, reject) => {
+                    const uploadTask = uploadBytesResumable(storageRef, selectedFile);
+                    uploadTask.on('state_changed',
+                        (snapshot) => {
+                            setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+                        },
+                        (error) => {
+                            // This will be caught by the outer try-catch block
+                            reject(error);
+                        },
+                        async () => {
+                            // Upload completed successfully, now get the download URL
+                            try {
+                                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                                fileInfo = { fileUrl: downloadURL, fileName: selectedFile.name };
+                                resolve();
+                            } catch (error) {
+                                reject(error);
+                            }
+                        }
+                    );
+                });
             }
 
             const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, user.uid);

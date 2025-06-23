@@ -63,16 +63,23 @@ const GradeForm = ({ submission, classroomId, assignmentId }: { submission: Subm
 
             if (feedbackFile) {
                 const storageRef = ref(storage, `feedback/${classroomId}/${assignmentId}/${submission.studentId}/${feedbackFile.name}`);
-                const uploadTask = uploadBytesResumable(storageRef, feedbackFile);
-                 
-                uploadTask.on('state_changed',
-                    (snapshot) => setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100)
-                );
-
-                await uploadTask;
-
-                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                fileInfo = { url: downloadURL, name: feedbackFile.name };
+                
+                await new Promise<void>((resolve, reject) => {
+                    const uploadTask = uploadBytesResumable(storageRef, feedbackFile);
+                    uploadTask.on('state_changed',
+                        (snapshot) => setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
+                        (error) => reject(error),
+                        async () => {
+                            try {
+                                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                                fileInfo = { url: downloadURL, name: feedbackFile.name };
+                                resolve();
+                            } catch (error) {
+                                reject(error);
+                            }
+                        }
+                    );
+                });
             }
 
             const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, submission.id);
