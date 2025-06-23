@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -22,6 +23,7 @@ service cloud.firestore {
     }
 
     function isEnrolled(classroomId) {
+      // Use hasAny for Firestore queries with 'in' operator
       return isAuth() && getUserData().enrolledClassroomIds.hasAny([classroomId]);
     }
 
@@ -34,8 +36,11 @@ service cloud.firestore {
     // --- Collection Rules ---
 
     match /users/{userId} {
+      // Admins or the user themselves can write.
       allow write: if isAdmin() || (isAuth() && request.auth.uid == userId);
+      // Admins or the user themselves can get their own doc.
       allow get: if isAuth() && (request.auth.uid == userId || isAdmin());
+      // Only admins can list all users.
       allow list: if isAdmin();
     }
     
@@ -72,6 +77,7 @@ service cloud.firestore {
 
             match /submissions/{submissionId} {
                 allow read: if isTeacherForClassroom(classroomId) || isAdmin() || (isAuth() && request.auth.uid == submissionId);
+                // Students can create/update their own submissions.
                 allow write: if isAuth() && request.auth.uid == submissionId && isEnrolled(classroomId);
             }
         }
@@ -83,7 +89,9 @@ service cloud.firestore {
             match /submissions/{submissionId} {
                 allow read: if isTeacherForClassroom(classroomId) || isAdmin() || (isAuth() && request.auth.uid == submissionId);
                 allow create: if isAuth() && request.auth.uid == submissionId && isEnrolled(classroomId);
-                allow update, delete: if false;
+                // Teachers/Admins can update submissions to grade them. Students cannot.
+                allow update: if isTeacherForClassroom(classroomId) || isAdmin();
+                allow delete: if false;
             }
         }
     }
