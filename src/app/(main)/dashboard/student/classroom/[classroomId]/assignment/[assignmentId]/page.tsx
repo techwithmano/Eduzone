@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
+import { Label } from '@/components/ui/label';
 
 const submissionSchema = z.object({
   content: z.string().max(5000, "Comment cannot exceed 5000 characters.").optional(),
