@@ -262,12 +262,17 @@ export default function AdminQuizResultsPage() {
     : 0;
 
   const getStatusBadge = (status: QuizSubmission['status']) => {
-    switch (status) {
-        case 'fully-graded': return <Badge className="bg-green-500 hover:bg-green-600">Graded</Badge>;
-        case 'pending-review': return <Badge variant="secondary">Pending Review</Badge>;
-        case 'auto-graded': return <Badge variant="outline">Auto-Graded</Badge>;
-        default: return <Badge variant="outline" className="capitalize">{status.replace('-', ' ')}</Badge>;
+    if (status === 'fully-graded') {
+      return <Badge className="bg-green-500 hover:bg-green-600">Graded</Badge>;
     }
+    if (status === 'pending-review') {
+      return <Badge variant="secondary">Pending Review</Badge>;
+    }
+    if (status === 'auto-graded') {
+      return <Badge variant="outline">Auto-Graded</Badge>;
+    }
+    // Fallback for any unexpected status
+    return <Badge variant="outline" className="capitalize">{status}</Badge>;
   }
 
   return (
