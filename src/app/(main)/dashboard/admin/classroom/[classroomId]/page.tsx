@@ -169,7 +169,25 @@ export default function AdminClassroomPage() {
   const handleCreateMaterial = simpleCreate('materials');
   const handleDeleteMaterial = simpleDelete('materials');
   const handleCreateQuiz = simpleCreate('quizzes');
-  const handleDeleteQuiz = simpleDelete('quizzes');
+  
+  const handleDeleteQuiz = async (quizId: string) => {
+    if (!classroomId) return;
+    try {
+        const batch = writeBatch(db);
+        
+        const submissionsRef = collection(db, `classrooms/${classroomId}/quizzes/${quizId}/submissions`);
+        const submissionsSnapshot = await getDocs(submissionsRef);
+        submissionsSnapshot.forEach(doc => batch.delete(doc.ref));
+
+        const quizRef = doc(db, `classrooms/${classroomId}/quizzes`, quizId);
+        batch.delete(quizRef);
+
+        await batch.commit();
+        toast({ title: "Quiz Deleted", description: "The quiz and all its submissions have been removed." });
+    } catch (error) {
+        toast({ variant: "destructive", title: "Deletion Failed", description: "There was a problem deleting the quiz." });
+    }
+  };
 
   const onAnnouncementSubmit = async (values: z.infer<typeof announcementSchema>) => {
     const success = await handleCreateAnnouncement(values);
@@ -188,7 +206,6 @@ export default function AdminClassroomPage() {
     if (success) { quizForm.reset(); setIsQuizDialogOpen(false); }
   };
   
-  // User Management
   const fetchUsers = useCallback(async (userIds: string[], setUserState: React.Dispatch<React.SetStateAction<EnrolledUser[]>>) => {
     if (userIds && userIds.length > 0) {
       const chunks = [];
@@ -272,7 +289,6 @@ export default function AdminClassroomPage() {
   };
 
 
-  // Settings
   const handleUpdateClassroom = async (values: z.infer<typeof editClassroomSchema>) => {
     setIsSubmitting(true);
     try {
@@ -286,7 +302,6 @@ export default function AdminClassroomPage() {
     }
   };
 
-  // Initial Data Loading
   useEffect(() => {
     if (authLoading) return;
     if (!user || user.role !== 'ADMIN') {
@@ -312,7 +327,6 @@ export default function AdminClassroomPage() {
                 fetchUsers(classroomData.enrolledStudentIds || [], setEnrolledStudents);
                 fetchUsers(classroomData.teacherIds || [], setAssignedTeachers);
 
-                // Setup listeners for content
                 Object.entries({ announcements: setAnnouncements, assignments: setAssignments, materials: setMaterials, quizzes: setQuizzes })
                     .forEach(([name, setter]) => {
                         const q = query(collection(db, `classrooms/${classroomId}/${name}`), orderBy('createdAt', 'desc'));
@@ -348,7 +362,7 @@ export default function AdminClassroomPage() {
             <AlertDialogTitle>Remove Student?</AlertDialogTitle>
             <AlertDialogDescription>This will remove "{studentToRemove?.displayName}" from the classroom.</AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveUser(studentToRemove, 'STUDENT')} className="bg-destructive hover:bg-destructive/90">Remove</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveUser(studentToRemove, 'STUDENT')} className={cn(buttonVariants({ variant: "destructive" }))}>Remove</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
       <AlertDialog open={!!teacherToRemove} onOpenChange={(open) => !open && setTeacherToRemove(null)}>
@@ -357,7 +371,7 @@ export default function AdminClassroomPage() {
             <AlertDialogTitle>Remove Teacher?</AlertDialogTitle>
             <AlertDialogDescription>This will remove "{teacherToRemove?.displayName}"'s access to this classroom.</AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveUser(teacherToRemove, 'TEACHER')} className="bg-destructive hover:bg-destructive/90">Remove</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveUser(teacherToRemove, 'TEACHER')} className={cn(buttonVariants({ variant: "destructive" }))}>Remove</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
@@ -531,7 +545,13 @@ export default function AdminClassroomPage() {
                                                       control={quizForm.control}
                                                       name={`questions.${index}.type`}
                                                       render={({ field: selectField }) => (
-                                                        <Select onValueChange={selectField.onChange} value={selectField.value}>
+                                                        <Select onValueChange={(value) => {
+                                                            selectField.onChange(value)
+                                                            updateQuizQuestion(index, {
+                                                                ...field,
+                                                                type: value as 'multiple-choice' | 'typed-answer',
+                                                            })
+                                                        }} value={selectField.value}>
                                                             <FormControl><SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger></FormControl>
                                                             <SelectContent>
                                                                 <SelectItem value="multiple-choice">Multiple Choice</SelectItem>

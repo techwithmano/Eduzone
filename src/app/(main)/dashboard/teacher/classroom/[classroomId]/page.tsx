@@ -10,7 +10,7 @@ import { z } from "zod";
 import { v4 as uuidv4 } from 'uuid';
 import {
   doc, getDoc, collection, addDoc, query, orderBy, onSnapshot,
-  serverTimestamp, deleteDoc, Unsubscribe,
+  serverTimestamp, deleteDoc, Unsubscribe, writeBatch, getDocs,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -137,7 +137,25 @@ export default function TeacherClassroomPage() {
   const handleCreateMaterial = simpleCreate('materials');
   const handleDeleteMaterial = simpleDelete('materials');
   const handleCreateQuiz = simpleCreate('quizzes');
-  const handleDeleteQuiz = simpleDelete('quizzes');
+  
+  const handleDeleteQuiz = async (quizId: string) => {
+    if (!classroomId) return;
+    try {
+        const batch = writeBatch(db);
+        
+        const submissionsRef = collection(db, `classrooms/${classroomId}/quizzes/${quizId}/submissions`);
+        const submissionsSnapshot = await getDocs(submissionsRef);
+        submissionsSnapshot.forEach(doc => batch.delete(doc.ref));
+
+        const quizRef = doc(db, `classrooms/${classroomId}/quizzes`, quizId);
+        batch.delete(quizRef);
+
+        await batch.commit();
+        toast({ title: "Quiz Deleted", description: "The quiz and all its submissions have been removed." });
+    } catch (error) {
+        toast({ variant: "destructive", title: "Deletion Failed", description: "There was a problem deleting the quiz." });
+    }
+  };
 
   const onAnnouncementSubmit = async (values: z.infer<typeof announcementSchema>) => {
     if(await handleCreateAnnouncement(values)) announcementForm.reset();
@@ -172,7 +190,7 @@ export default function TeacherClassroomPage() {
             const classroomData = classroomDoc.data() as Classroom;
 
             if (classroomDoc.exists() && classroomData.teacherIds?.includes(user.uid)) {
-                setClassroom({ id: classroomDoc.id, ...classroomData });
+                setClassroom({ ...classroomData, id: classroomDoc.id });
 
                 Object.entries({ announcements: setAnnouncements, assignments: setAssignments, materials: setMaterials, quizzes: setQuizzes })
                     .forEach(([name, setter]) => {
