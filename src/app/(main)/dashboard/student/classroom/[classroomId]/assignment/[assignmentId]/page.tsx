@@ -68,54 +68,43 @@ const SubmissionForm = ({ assignment, classroomId, assignmentId }: { assignment:
         setIsSubmitting(true);
         setUploadProgress(0);
 
-        const submitData = async (fileUrl?: string, fileName?: string) => {
-             try {
-                const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, user.uid);
+        let fileUrl: string | undefined;
+        let fileName: string | undefined;
+
+        try {
+            if (selectedFile) {
+                const storageRef = ref(storage, `submissions/${classroomId}/${assignmentId}/${user.uid}/${selectedFile.name}`);
+                const uploadTask = uploadBytesResumable(storageRef, selectedFile);
                 
-                const submissionData: Omit<Submission, 'id'> = {
-                    studentId: user.uid,
-                    studentName: user.displayName || 'Anonymous Student',
-                    status: 'submitted',
-                    submittedAt: serverTimestamp() as Timestamp,
-                    ...(values.content && { content: values.content }),
-                    ...(fileUrl && { fileUrl: fileUrl, fileName: fileName }),
-                };
-
-                await setDoc(submissionDocRef, submissionData);
-                toast({ title: 'Success!', description: `Your work for "${assignment.title}" has been submitted.` });
-                
-            } catch (error) {
-                console.error("Submission error: ", error);
-                toast({ variant: 'destructive', title: 'Error', description: 'Failed to save your submission data.' });
-            } finally {
-                setIsSubmitting(false);
-            }
-        }
-
-        if (!selectedFile) {
-            await submitData();
-            return;
-        }
-
-        const storageRef = ref(storage, `submissions/${classroomId}/${assignmentId}/${user.uid}/${selectedFile.name}`);
-        const uploadTask = uploadBytesResumable(storageRef, selectedFile);
-
-        uploadTask.on('state_changed',
-            (snapshot) => {
-                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                setUploadProgress(progress);
-            },
-            (error) => {
-                console.error("Upload error: ", error);
-                toast({ variant: 'destructive', title: 'Upload Failed', description: 'There was a problem uploading your file.' });
-                setIsSubmitting(false);
-            },
-            () => {
-                getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-                    submitData(downloadURL, selectedFile.name);
+                uploadTask.on('state_changed', (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    setUploadProgress(progress);
                 });
+
+                await uploadTask; // Wait for upload to complete
+
+                fileUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                fileName = selectedFile.name;
             }
-        );
+
+            const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, user.uid);
+            const submissionData: Omit<Submission, 'id'> = {
+                studentId: user.uid,
+                studentName: user.displayName || 'Anonymous Student',
+                status: 'submitted',
+                submittedAt: serverTimestamp() as Timestamp,
+                ...(values.content && { content: values.content }),
+                ...(fileUrl && { fileUrl: fileUrl, fileName: fileName }),
+            };
+
+            await setDoc(submissionDocRef, submissionData);
+            toast({ title: 'Success!', description: `Your work for "${assignment.title}" has been submitted.` });
+        } catch (error) {
+            console.error("Submission error: ", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit. Please check your file or network connection.' });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -160,7 +149,7 @@ const SubmissionForm = ({ assignment, classroomId, assignmentId }: { assignment:
                             </FormControl>
                             <Input id="file-upload" type="file" className="sr-only" onChange={handleFileChange} />
                         </div>
-                        {isSubmitting && <Progress value={uploadProgress} className="w-full" />}
+                        {isSubmitting && selectedFile && <Progress value={uploadProgress} className="w-full" />}
                         <Button type="submit" disabled={isSubmitting} className="w-full">
                             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Submit Assignment

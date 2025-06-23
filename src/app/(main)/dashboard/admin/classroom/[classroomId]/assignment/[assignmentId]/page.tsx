@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { doc, getDoc, collection, query, orderBy, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, query, orderBy, onSnapshot, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase/client';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -60,49 +60,41 @@ const GradeForm = ({ submission, classroomId, assignmentId }: { submission: Subm
         setIsGrading(true);
         setUploadProgress(0);
 
-        const sendGradeData = async (fileUrl?: string, fileName?: string) => {
-            try {
-                const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, submission.id);
-                await updateDoc(submissionDocRef, {
-                    status: 'graded',
-                    grade: values.grade,
-                    teacherFeedback: values.feedback,
-                    gradedAt: serverTimestamp(),
-                    ...(fileUrl && { teacherFeedbackFileUrl: fileUrl, teacherFeedbackFileName: fileName }),
-                });
-                toast({ title: 'Success!', description: `Grade has been returned to ${submission.studentName}.` });
-            } catch (error) {
-                console.error("Grading error: ", error);
-                toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit the grade.' });
-            } finally {
-                setIsGrading(false);
-            }
-        };
+        let feedbackFileUrl: string | undefined;
+        let feedbackFileName: string | undefined;
+        
+        try {
+            if (feedbackFile) {
+                const storageRef = ref(storage, `graded-submissions/${classroomId}/${assignmentId}/${submission.id}/${feedbackFile.name}`);
+                const uploadTask = uploadBytesResumable(storageRef, feedbackFile);
 
-        if (!feedbackFile) {
-            await sendGradeData();
-            return;
+                uploadTask.on('state_changed', (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    setUploadProgress(progress);
+                });
+
+                await uploadTask; // Wait for upload to complete
+
+                feedbackFileUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                feedbackFileName = feedbackFile.name;
+            }
+            
+            const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, submission.id);
+            await updateDoc(submissionDocRef, {
+                status: 'graded',
+                grade: values.grade,
+                teacherFeedback: values.feedback,
+                gradedAt: serverTimestamp(),
+                ...(feedbackFileUrl && { teacherFeedbackFileUrl: feedbackFileUrl, teacherFeedbackFileName: feedbackFileName }),
+            });
+
+            toast({ title: 'Success!', description: `Grade has been returned to ${submission.studentName}.` });
+        } catch (error) {
+            console.error("Grading error: ", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit the grade. Please try again.' });
+        } finally {
+            setIsGrading(false);
         }
-
-        const storageRef = ref(storage, `graded-submissions/${classroomId}/${assignmentId}/${submission.id}/${feedbackFile.name}`);
-        const uploadTask = uploadBytesResumable(storageRef, feedbackFile);
-
-        uploadTask.on('state_changed',
-            (snapshot) => {
-                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                setUploadProgress(progress);
-            },
-            (error) => {
-                console.error("Upload error: ", error);
-                toast({ variant: 'destructive', title: 'Upload Failed', description: 'There was a problem uploading your feedback file.' });
-                setIsGrading(false);
-            },
-            () => {
-                getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-                    sendGradeData(downloadURL, feedbackFile.name);
-                });
-            }
-        );
     };
 
     return (
